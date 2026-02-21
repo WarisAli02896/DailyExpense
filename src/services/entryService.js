@@ -1,15 +1,15 @@
 import { getDBConnection } from './database';
 import { formatDateForDB } from '../utils/dateUtils';
 
-export const addEntry = async ({ userId, type, entryType, title, amount, companyName, categoryId, date, notes, isRecurring }) => {
+export const addEntry = async ({ userId, type, entryType, title, amount, companyName, categoryId, date, notes, isRecurring, invoiceUri, invoiceType }) => {
   try {
     const db = await getDBConnection();
     const dateStr = date || formatDateForDB(new Date());
 
     const result = await db.runAsync(
-      `INSERT INTO entries (user_id, type, entry_type, title, amount, company_name, category_id, date, notes, is_recurring)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, type, entryType, title, amount, companyName || null, categoryId || null, dateStr, notes || null, isRecurring ? 1 : 0]
+      `INSERT INTO entries (user_id, type, entry_type, title, amount, company_name, category_id, date, notes, is_recurring, invoice_uri, invoice_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, type, entryType, title, amount, companyName || null, categoryId || null, dateStr, notes || null, isRecurring ? 1 : 0, invoiceUri || null, invoiceType || null]
     );
 
     return { success: true, message: 'Entry added successfully!', data: { id: result.lastInsertRowId } };

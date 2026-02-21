@@ -19,6 +19,11 @@ export const EXPENSE_MESSAGES = {
   DATE_REQUIRED: 'Date is required.',
   DATE_INVALID: 'Please enter a valid date.',
 
+  // Invoice
+  INVOICE_PICK_FAILED: 'Could not pick file. Please try again.',
+  INVOICE_SAVE_FAILED: 'Failed to save invoice file.',
+  INVOICE_OPEN_FAILED: 'Cannot open this file.',
+
   // Info
   NO_EXPENSES: 'No expenses found. Start adding your expenses!',
   CONFIRM_DELETE: 'Are you sure you want to delete this expense?',

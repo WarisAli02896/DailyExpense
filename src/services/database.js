@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'dailyexpense.db';
-const DB_VERSION = 3;
+const DB_VERSION = 5;
 
 let db = null;
 
@@ -64,6 +64,8 @@ export const initializeDatabase = async () => {
       date TEXT NOT NULL,
       notes TEXT,
       is_recurring INTEGER DEFAULT 0,
+      invoice_uri TEXT,
+      invoice_type TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (category_id) REFERENCES categories(id)

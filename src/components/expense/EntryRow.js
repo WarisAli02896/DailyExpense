@@ -4,11 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 
-const EntryRow = ({ title, amount, type, category, date, onDelete }) => {
+const EntryRow = ({ title, amount, type, category, date, invoiceUri, onPress, onDelete }) => {
   const isEarning = type === 'earning';
 
   return (
-    <View style={styles.row}>
+    <Pressable
+      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      onPress={onPress}
+      role="button"
+    >
       <View style={[styles.typeIndicator, isEarning ? styles.earningIndicator : styles.spendingIndicator]} />
 
       <View style={styles.iconContainer}>
@@ -21,9 +25,17 @@ const EntryRow = ({ title, amount, type, category, date, onDelete }) => {
 
       <View style={styles.details}>
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
-        <Text style={styles.meta}>
-          {category}{date ? ` • ${date}` : ''}
-        </Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.meta}>
+            {category}{date ? ` · ${date}` : ''}
+          </Text>
+          {invoiceUri ? (
+            <View style={styles.invoiceTag}>
+              <Ionicons name="attach" size={12} color={COLORS.primary} />
+              <Text style={styles.invoiceTagText}>Invoice</Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <Text style={[styles.amount, isEarning ? styles.earningAmount : styles.spendingAmount]}>
@@ -32,14 +44,17 @@ const EntryRow = ({ title, amount, type, category, date, onDelete }) => {
 
       <Pressable
         style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
-        onPress={onDelete}
+        onPress={(e) => {
+          e.stopPropagation();
+          onDelete?.();
+        }}
         role="button"
         aria-label={`Delete ${title}`}
         hitSlop={8}
       >
         <Ionicons name="trash-outline" size={20} color={COLORS.danger} />
       </Pressable>
-    </View>
+    </Pressable>
   );
 };
 
@@ -83,6 +98,11 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: 3,
   },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   meta: {
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
@@ -104,6 +124,24 @@ const styles = StyleSheet.create({
   },
   deleteBtnPressed: {
     backgroundColor: 'rgba(244, 67, 54, 0.1)',
+  },
+  rowPressed: {
+    opacity: 0.85,
+    backgroundColor: COLORS.borderLight,
+  },
+  invoiceTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '12',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    gap: 3,
+  },
+  invoiceTagText: {
+    fontSize: 10,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.primary,
   },
 });
 

@@ -8,24 +8,30 @@ import {
   Platform,
   ScrollView,
   Alert,
+  Image,
+  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Input, Dropdown } from '../../components/common';
+import { Button, Input } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
-import { EARNING_TYPES } from '../../constants/categories';
 import { addEntry } from '../../services/entryService';
+import { pickInvoice, saveInvoice, formatFileSize, isImageFile, getFileType } from '../../services/fileService';
 import { useAuth } from '../../hooks/useAuth';
-import { formatDateForDB } from '../../utils/dateUtils';
+import { formatDateForDB, getMonthName } from '../../utils/dateUtils';
 
 const SalaryFormScreen = ({ navigation }) => {
   const { user } = useAuth();
-  const [earningType, setEarningType] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [amount, setAmount] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
+  const [invoice, setInvoice] = useState(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  const now = new Date();
+  const currentMonthName = getMonthName(now.getMonth() + 1);
+  const currentYear = now.getFullYear();
 
   const handleAmountChange = (text) => {
     const filtered = text.replace(/[^0-9.]/g, '');
@@ -35,14 +41,24 @@ const SalaryFormScreen = ({ navigation }) => {
     if (errors.amount) setErrors((prev) => ({ ...prev, amount: null }));
   };
 
+  const handlePickInvoice = async () => {
+    const result = await pickInvoice();
+    if (result.success) {
+      setInvoice(result.file);
+    } else if (!result.canceled) {
+      Alert.alert('Error', result.message || 'Could not pick file.');
+    }
+  };
+
+  const handleRemoveInvoice = () => {
+    setInvoice(null);
+  };
+
   const validate = () => {
     const newErrors = {};
-
-    if (!earningType) newErrors.earningType = 'Please select an earning type';
     if (!companyName.trim()) newErrors.companyName = 'Company name is required';
     if (!amount.trim()) newErrors.amount = 'Amount is required';
     else if (parseFloat(amount) <= 0) newErrors.amount = 'Amount must be greater than 0';
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -52,17 +68,24 @@ const SalaryFormScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const typeLabel = EARNING_TYPES.find((t) => t.value === earningType)?.label || earningType;
+      let invoiceUri = null;
+      let invoiceType = null;
+      if (invoice) {
+        invoiceUri = await saveInvoice(invoice.uri, invoice.name);
+        invoiceType = invoice.mimeType || null;
+      }
 
       const result = await addEntry({
         userId: user.id,
         type: 'earning',
-        entryType: earningType,
-        title: `${typeLabel} - ${companyName}`,
+        entryType: 'salary',
+        title: `Salary - ${companyName}`,
         amount: parseFloat(amount),
         companyName,
         date: formatDateForDB(new Date()),
         isRecurring,
+        invoiceUri,
+        invoiceType,
       });
 
       if (result.success) {
@@ -77,6 +100,8 @@ const SalaryFormScreen = ({ navigation }) => {
     }
   };
 
+  const fileType = invoice ? getFileType(invoice.mimeType) : null;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -87,6 +112,12 @@ const SalaryFormScreen = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Month Banner */}
+        <View style={styles.monthBanner}>
+          <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
+          <Text style={styles.monthText}>{currentMonthName} {currentYear}</Text>
+        </View>
+
         {/* Header Badge */}
         <View style={styles.badge}>
           <Ionicons name="cash-outline" size={20} color={COLORS.income} />
@@ -95,18 +126,6 @@ const SalaryFormScreen = ({ navigation }) => {
 
         {/* Form */}
         <View style={styles.form}>
-          <Dropdown
-            label="Earning Type"
-            value={earningType}
-            options={EARNING_TYPES}
-            onSelect={(val) => {
-              setEarningType(val);
-              if (errors.earningType) setErrors((prev) => ({ ...prev, earningType: null }));
-            }}
-            placeholder="Select earning type"
-            error={errors.earningType}
-          />
-
           <Input
             label="Company Name"
             value={companyName}
@@ -135,6 +154,56 @@ const SalaryFormScreen = ({ navigation }) => {
                 />
               </View>
             </View>
+          </View>
+
+          {/* Invoice Attachment */}
+          <View style={styles.invoiceSection}>
+            <Text style={styles.inputLabel}>Invoice / Receipt</Text>
+            {!invoice ? (
+              <Pressable
+                style={({ pressed }) => [styles.invoicePickerBtn, pressed && styles.invoicePickerBtnPressed]}
+                onPress={handlePickInvoice}
+                role="button"
+              >
+                <View style={styles.invoicePickerContent}>
+                  <View style={styles.invoiceIconCircle}>
+                    <Ionicons name="cloud-upload-outline" size={28} color={COLORS.primary} />
+                  </View>
+                  <Text style={styles.invoicePickerTitle}>Tap to attach</Text>
+                  <Text style={styles.invoicePickerHint}>Image, PDF, or Word document</Text>
+                </View>
+              </Pressable>
+            ) : (
+              <View style={styles.invoicePreview}>
+                <View style={styles.invoicePreviewLeft}>
+                  {fileType === 'image' ? (
+                    <Image source={{ uri: invoice.uri }} style={styles.invoiceThumbnail} />
+                  ) : (
+                    <View style={[styles.invoiceFileIcon, fileType === 'pdf' ? styles.pdfBg : styles.docBg]}>
+                      <Ionicons
+                        name={fileType === 'pdf' ? 'document-text' : 'document'}
+                        size={24}
+                        color={COLORS.textWhite}
+                      />
+                    </View>
+                  )}
+                  <View style={styles.invoiceInfo}>
+                    <Text style={styles.invoiceFileName} numberOfLines={1}>{invoice.name}</Text>
+                    <Text style={styles.invoiceFileSize}>
+                      {formatFileSize(invoice.size)} {fileType === 'pdf' ? '· PDF' : fileType === 'doc' ? '· DOC' : '· Image'}
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  style={({ pressed }) => [styles.removeInvoiceBtn, pressed && { opacity: 0.6 }]}
+                  onPress={handleRemoveInvoice}
+                  role="button"
+                  hitSlop={8}
+                >
+                  <Ionicons name="close-circle" size={24} color={COLORS.danger} />
+                </Pressable>
+              </View>
+            )}
           </View>
 
           {/* Recurring Toggle */}
@@ -187,6 +256,23 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 40,
   },
+  monthBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '10',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '20',
+  },
+  monthText: {
+    fontSize: FONTS.sizes.base,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.primary,
+  },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -237,6 +323,94 @@ const styles = StyleSheet.create({
   },
   amountInput: {
     marginBottom: 0,
+  },
+  invoiceSection: {
+    marginBottom: 16,
+  },
+  invoicePickerBtn: {
+    borderWidth: 2,
+    borderColor: COLORS.primary + '30',
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    padding: 24,
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  invoicePickerBtnPressed: {
+    backgroundColor: COLORS.primary + '08',
+  },
+  invoicePickerContent: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  invoiceIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: COLORS.primary + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  invoicePickerTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.text,
+  },
+  invoicePickerHint: {
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.textSecondary,
+  },
+  invoicePreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  invoicePreviewLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  invoiceThumbnail: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    backgroundColor: COLORS.borderLight,
+  },
+  invoiceFileIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pdfBg: {
+    backgroundColor: '#E53935',
+  },
+  docBg: {
+    backgroundColor: '#1565C0',
+  },
+  invoiceInfo: {
+    flex: 1,
+  },
+  invoiceFileName: {
+    fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  invoiceFileSize: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+  },
+  removeInvoiceBtn: {
+    padding: 4,
   },
   recurringCard: {
     flexDirection: 'row',

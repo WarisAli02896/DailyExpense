@@ -13,7 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import EntryRow from '../../components/expense/EntryRow';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
-import { getMonthName, getShortMonthName, formatDate } from '../../utils/dateUtils';
+import { getMonthName, getShortMonthName } from '../../utils/dateUtils';
 import { formatAmount } from '../../utils/currencyUtils';
 import { getEntriesByMonth, getMonthSummary, deleteEntry } from '../../services/entryService';
 import { useAuth } from '../../hooks/useAuth';
@@ -95,6 +95,8 @@ const HomeScreen = ({ navigation }) => {
         type={item.type}
         category={item.entry_type}
         date={dateLabel}
+        invoiceUri={item.invoice_uri}
+        onPress={() => navigation.navigate('EntryDetail', { entry: item })}
         onDelete={() => handleDelete(item)}
       />
     );
@@ -185,6 +187,7 @@ const HomeScreen = ({ navigation }) => {
       >
         <Ionicons name="add" size={30} color={COLORS.textWhite} />
       </Pressable>
+
     </View>
   );
 };
