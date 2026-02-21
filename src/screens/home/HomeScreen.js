@@ -151,6 +151,18 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </View>
 
+      <Pressable
+        style={({ pressed }) => [styles.recurringLink, pressed && { opacity: 0.8 }]}
+        onPress={() => navigation.navigate('RecurringEntries')}
+        role="button"
+      >
+        <View style={styles.recurringLinkLeft}>
+          <Ionicons name="repeat" size={18} color={COLORS.primary} />
+          <Text style={styles.recurringLinkText}>Monthly Recurring Entries</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+      </Pressable>
+
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Entries</Text>
         <Text style={styles.entryCount}>{entries.length} entries</Text>
@@ -291,6 +303,28 @@ const styles = StyleSheet.create({
     height: 36,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginHorizontal: 12,
+  },
+  recurringLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.primary + '08',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '18',
+  },
+  recurringLinkLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  recurringLinkText: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.primary,
   },
   sectionHeader: {
     flexDirection: 'row',

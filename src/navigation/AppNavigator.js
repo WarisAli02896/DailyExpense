@@ -6,6 +6,7 @@ import SalaryFormScreen from '../screens/expense/SalaryFormScreen';
 import AddExpenseScreen from '../screens/expense/AddExpenseScreen';
 import InvestmentFormScreen from '../screens/expense/InvestmentFormScreen';
 import EntryDetailScreen from '../screens/expense/EntryDetailScreen';
+import RecurringEntriesScreen from '../screens/expense/RecurringEntriesScreen';
 import AccountsScreen from '../screens/accounts/AccountsScreen';
 import AccountSummaryScreen from '../screens/accounts/AccountSummaryScreen';
 import ProfileScreen from '../screens/settings/ProfileScreen';
@@ -52,6 +53,11 @@ const AppNavigator = () => {
         name="EntryDetail"
         component={EntryDetailScreen}
         options={{ title: 'Entry Details' }}
+      />
+      <Stack.Screen
+        name="RecurringEntries"
+        component={RecurringEntriesScreen}
+        options={{ title: 'Recurring Entries' }}
       />
       <Stack.Screen
         name="Accounts"
