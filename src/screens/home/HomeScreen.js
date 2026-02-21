@@ -13,7 +13,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import EntryRow from '../../components/expense/EntryRow';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
-import { getMonthName, getShortMonthName } from '../../utils/dateUtils';
+import { getMonthName, getShortMonthName, formatTime12h } from '../../utils/dateUtils';
 import { formatAmount } from '../../utils/currencyUtils';
 import { getEntriesByMonth, getMonthSummary, deleteEntry } from '../../services/entryService';
 import { useAuth } from '../../hooks/useAuth';
@@ -86,7 +86,9 @@ const HomeScreen = ({ navigation }) => {
 
   const renderEntry = ({ item }) => {
     const day = new Date(item.date);
-    const dateLabel = `${String(day.getDate()).padStart(2, '0')} ${getShortMonthName(day.getMonth() + 1)}`;
+    const datePart = `${String(day.getDate()).padStart(2, '0')} ${getShortMonthName(day.getMonth() + 1)}`;
+    const timePart = formatTime12h(item.date);
+    const dateLabel = timePart ? `${datePart} · ${timePart}` : datePart;
 
     return (
       <EntryRow

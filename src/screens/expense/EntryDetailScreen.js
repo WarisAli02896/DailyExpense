@@ -14,7 +14,7 @@ import * as Sharing from 'expo-sharing';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import { formatAmount } from '../../utils/currencyUtils';
-import { getMonthName } from '../../utils/dateUtils';
+import { getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { deleteEntry } from '../../services/entryService';
 import { Button } from '../../components/common';
 
@@ -25,6 +25,7 @@ const EntryDetailScreen = ({ route, navigation }) => {
   const isEarning = entry.type === 'earning';
   const entryDate = new Date(entry.date);
   const dateDisplay = `${String(entryDate.getDate()).padStart(2, '0')} ${getMonthName(entryDate.getMonth() + 1)} ${entryDate.getFullYear()}`;
+  const timeDisplay = formatTime12h(entry.date);
 
   const hasInvoice = !!entry.invoice_uri;
   const mime = (entry.invoice_type || '').toLowerCase();
@@ -131,6 +132,7 @@ const EntryDetailScreen = ({ route, navigation }) => {
           <DetailRow icon="business-outline" label="Company" value={entry.company_name} />
         )}
         <DetailRow icon="calendar-outline" label="Date" value={dateDisplay} />
+        {timeDisplay ? <DetailRow icon="time-outline" label="Time" value={timeDisplay} /> : null}
         <DetailRow
           icon="repeat-outline"
           label="Recurring"

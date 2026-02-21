@@ -11,6 +11,9 @@ const AddEntryScreen = ({ navigation }) => {
       case 'salary':
         navigation.navigate('SalaryForm');
         break;
+      case 'expense':
+        navigation.navigate('AddExpense');
+        break;
       default:
         break;
     }
@@ -23,7 +26,7 @@ const AddEntryScreen = ({ navigation }) => {
 
       <View style={styles.grid}>
         {ENTRY_TYPES.map((entry) => {
-          const isDisabled = entry.id !== 'salary';
+          const isDisabled = entry.id !== 'salary' && entry.id !== 'expense';
 
           return (
             <Pressable
