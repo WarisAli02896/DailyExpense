@@ -1,6 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import BottomTabNavigator from './BottomTabNavigator';
+import AddEntryScreen from '../screens/expense/AddEntryScreen';
+import SalaryFormScreen from '../screens/expense/SalaryFormScreen';
 import AddExpenseScreen from '../screens/expense/AddExpenseScreen';
 import ExpenseDetailScreen from '../screens/expense/ExpenseDetailScreen';
 import ProfileScreen from '../screens/settings/ProfileScreen';
@@ -22,6 +24,16 @@ const AppNavigator = () => {
         name="MainTabs"
         component={BottomTabNavigator}
         options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="AddEntry"
+        component={AddEntryScreen}
+        options={{ title: 'Add Entry' }}
+      />
+      <Stack.Screen
+        name="SalaryForm"
+        component={SalaryFormScreen}
+        options={{ title: 'Add Salary' }}
       />
       <Stack.Screen
         name="AddExpense"

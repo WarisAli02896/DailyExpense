@@ -1,42 +1,82 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   Pressable,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import EntryRow from '../../components/expense/EntryRow';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
-import { getMonthName } from '../../utils/dateUtils';
-
-const MOCK_ENTRIES = [
-  { id: '1', title: 'Salary', amount: '85,000', type: 'earning', category: 'Income', date: '01 Feb' },
-  { id: '2', title: 'Freelance Project', amount: '15,000', type: 'earning', category: 'Freelance', date: '05 Feb' },
-  { id: '3', title: 'Grocery Shopping', amount: '4,500', type: 'spending', category: 'Groceries', date: '06 Feb' },
-  { id: '4', title: 'Electricity Bill', amount: '3,200', type: 'spending', category: 'Bills & Utilities', date: '08 Feb' },
-  { id: '5', title: 'Lunch with Team', amount: '1,800', type: 'spending', category: 'Food & Dining', date: '10 Feb' },
-  { id: '6', title: 'Transport', amount: '2,000', type: 'spending', category: 'Transport', date: '12 Feb' },
-  { id: '7', title: 'Netflix', amount: '1,500', type: 'spending', category: 'Entertainment', date: '15 Feb' },
-];
+import { getMonthName, getShortMonthName, formatDate } from '../../utils/dateUtils';
+import { formatAmount } from '../../utils/currencyUtils';
+import { getEntriesByMonth, getMonthSummary, deleteEntry } from '../../services/entryService';
+import { useAuth } from '../../hooks/useAuth';
 
 const HomeScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [entries, setEntries] = useState(MOCK_ENTRIES);
+  const [entries, setEntries] = useState([]);
+  const [summary, setSummary] = useState({ totalEarnings: 0, totalSpendings: 0, amountLeft: 0 });
+  const [refreshing, setRefreshing] = useState(false);
+
+  const now = currentTime;
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const now = currentTime;
-  const monthName = getMonthName(now.getMonth() + 1);
-  const year = now.getFullYear();
+  const loadData = useCallback(async () => {
+    if (!user) return;
 
+    const [entriesResult, summaryResult] = await Promise.all([
+      getEntriesByMonth(user.id, currentMonth, currentYear),
+      getMonthSummary(user.id, currentMonth, currentYear),
+    ]);
+
+    if (entriesResult.success) setEntries(entriesResult.data);
+    if (summaryResult.success) setSummary(summaryResult.data);
+  }, [user, currentMonth, currentYear]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
+
+  const handleDelete = (entry) => {
+    Alert.alert(
+      'Delete Entry',
+      `Are you sure you want to delete "${entry.title}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deleteEntry(entry.id);
+            if (result.success) loadData();
+          },
+        },
+      ]
+    );
+  };
+
+  const monthName = getMonthName(currentMonth);
   const hours = now.getHours();
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const seconds = String(now.getSeconds()).padStart(2, '0');
@@ -44,31 +84,27 @@ const HomeScreen = ({ navigation }) => {
   const displayHours = String(hours % 12 || 12).padStart(2, '0');
   const timeString = `${displayHours}:${minutes}:${seconds}`;
 
-  const totalEarnings = 100000;
-  const totalSpendings = 13000;
-  const amountLeft = totalEarnings - totalSpendings;
+  const renderEntry = ({ item }) => {
+    const day = new Date(item.date);
+    const dateLabel = `${String(day.getDate()).padStart(2, '0')} ${getShortMonthName(day.getMonth() + 1)}`;
 
-  const handleDelete = (id) => {
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+    return (
+      <EntryRow
+        title={item.title}
+        amount={formatAmount(item.amount)}
+        type={item.type}
+        category={item.entry_type}
+        date={dateLabel}
+        onDelete={() => handleDelete(item)}
+      />
+    );
   };
-
-  const renderEntry = ({ item }) => (
-    <EntryRow
-      title={item.title}
-      amount={item.amount}
-      type={item.type}
-      category={item.category}
-      date={item.date}
-      onDelete={() => handleDelete(item.id)}
-    />
-  );
 
   const ListHeader = () => (
     <View>
-      {/* Month & Clock Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.monthText}>{monthName} {year}</Text>
+          <Text style={styles.monthText}>{monthName} {currentYear}</Text>
           <Text style={styles.greeting}>Your monthly overview</Text>
         </View>
         <View style={styles.clockContainer}>
@@ -78,10 +114,9 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Balance Card */}
       <View style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Amount Left This Month</Text>
-        <Text style={styles.balanceAmount}>Rs. {amountLeft.toLocaleString()}</Text>
+        <Text style={styles.balanceAmount}>Rs. {formatAmount(summary.amountLeft)}</Text>
 
         <View style={styles.balanceRow}>
           <View style={styles.balanceItem}>
@@ -91,7 +126,7 @@ const HomeScreen = ({ navigation }) => {
             <View>
               <Text style={styles.balanceItemLabel}>Earnings</Text>
               <Text style={[styles.balanceItemValue, { color: COLORS.income }]}>
-                Rs. {totalEarnings.toLocaleString()}
+                Rs. {formatAmount(summary.totalEarnings)}
               </Text>
             </View>
           </View>
@@ -105,14 +140,13 @@ const HomeScreen = ({ navigation }) => {
             <View>
               <Text style={styles.balanceItemLabel}>Spendings</Text>
               <Text style={[styles.balanceItemValue, { color: COLORS.expense }]}>
-                Rs. {totalSpendings.toLocaleString()}
+                Rs. {formatAmount(summary.totalSpendings)}
               </Text>
             </View>
           </View>
         </View>
       </View>
 
-      {/* Section Title */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Entries</Text>
         <Text style={styles.entryCount}>{entries.length} entries</Text>
@@ -133,17 +167,19 @@ const HomeScreen = ({ navigation }) => {
       <FlatList
         data={entries}
         renderItem={renderEntry}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String(item.id)}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} tintColor={COLORS.primary} />
+        }
       />
 
-      {/* Floating Add Button */}
       <Pressable
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-        onPress={() => navigation.navigate('AddExpense')}
+        onPress={() => navigation.navigate('AddEntry')}
         role="button"
         aria-label="Add new entry"
       >
@@ -162,8 +198,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 100,
   },
-
-  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -202,8 +236,6 @@ const styles = StyleSheet.create({
     fontWeight: FONTS.weights.bold,
     color: COLORS.primary,
   },
-
-  // Balance Card
   balanceCard: {
     backgroundColor: COLORS.primary,
     borderRadius: 20,
@@ -255,8 +287,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     marginHorizontal: 12,
   },
-
-  // Section
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -272,8 +302,6 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
   },
-
-  // Empty
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 50,
@@ -289,8 +317,6 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
     marginTop: 6,
   },
-
-  // FAB
   fab: {
     position: 'absolute',
     bottom: 24,

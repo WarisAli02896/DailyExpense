@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'dailyexpense.db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let db = null;
 
@@ -25,6 +25,7 @@ export const initializeDatabase = async () => {
   if (currentVersion < DB_VERSION) {
     await database.execAsync('DROP TABLE IF EXISTS users');
     await database.execAsync('DROP TABLE IF EXISTS expenses');
+    await database.execAsync('DROP TABLE IF EXISTS entries');
     await database.execAsync('DROP TABLE IF EXISTS budgets');
     await database.execAsync('DROP TABLE IF EXISTS categories');
     await database.execAsync(`PRAGMA user_version = ${DB_VERSION}`);
@@ -51,14 +52,18 @@ export const initializeDatabase = async () => {
   `);
 
   await database.execAsync(`
-    CREATE TABLE IF NOT EXISTS expenses (
+    CREATE TABLE IF NOT EXISTS entries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('earning', 'spending')),
+      entry_type TEXT NOT NULL,
       title TEXT NOT NULL,
       amount REAL NOT NULL,
+      company_name TEXT,
       category_id INTEGER,
       date TEXT NOT NULL,
       notes TEXT,
+      is_recurring INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (category_id) REFERENCES categories(id)

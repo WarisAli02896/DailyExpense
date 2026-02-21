@@ -23,3 +23,17 @@ export const CATEGORY_ICONS = {
   'Rent': 'home',
   'Other': 'ellipsis-horizontal',
 };
+
+export const EARNING_TYPES = [
+  { value: 'salary', label: 'Salary', icon: 'cash-outline' },
+  { value: 'bonus', label: 'Bonus', icon: 'gift-outline' },
+  { value: 'overtime', label: 'Overtime', icon: 'time-outline' },
+  { value: 'advance', label: 'Advance', icon: 'arrow-forward-circle-outline' },
+];
+
+export const ENTRY_TYPES = [
+  { id: 'salary', label: 'Salary', icon: 'cash-outline', color: '#4CAF50', type: 'earning' },
+  { id: 'expense', label: 'Expense', icon: 'cart-outline', color: '#F44336', type: 'spending' },
+  { id: 'freelance', label: 'Freelance', icon: 'laptop-outline', color: '#2196F3', type: 'earning' },
+  { id: 'bills', label: 'Bills', icon: 'flash-outline', color: '#FF9800', type: 'spending' },
+];
