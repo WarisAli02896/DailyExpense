@@ -1,0 +1,60 @@
+import React from 'react';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
+import HomeScreen from '../screens/home/HomeScreen';
+import ExpenseListScreen from '../screens/expense/ExpenseListScreen';
+import BudgetScreen from '../screens/budget/BudgetScreen';
+import ReportsScreen from '../screens/reports/ReportsScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
+import { COLORS } from '../constants/colors';
+
+const Tab = createBottomTabNavigator();
+
+const getTabIcon = (routeName, focused) => {
+  const icons = {
+    Home: focused ? 'home' : 'home-outline',
+    Expenses: focused ? 'wallet' : 'wallet-outline',
+    Budget: focused ? 'pie-chart' : 'pie-chart-outline',
+    Reports: focused ? 'bar-chart' : 'bar-chart-outline',
+    Settings: focused ? 'settings' : 'settings-outline',
+  };
+  return icons[routeName] || 'help-circle-outline';
+};
+
+const BottomTabNavigator = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => (
+          <Ionicons
+            name={getTabIcon(route.name, focused)}
+            size={size}
+            color={color}
+          />
+        ),
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textLight,
+        tabBarStyle: {
+          backgroundColor: COLORS.surface,
+          borderTopColor: COLORS.borderLight,
+          height: 60,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+        },
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Expenses" component={ExpenseListScreen} />
+      <Tab.Screen name="Budget" component={BudgetScreen} />
+      <Tab.Screen name="Reports" component={ReportsScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
+    </Tab.Navigator>
+  );
+};
+
+export default BottomTabNavigator;
