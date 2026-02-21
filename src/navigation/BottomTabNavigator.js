@@ -2,8 +2,8 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/home/HomeScreen';
+import AccountsScreen from '../screens/accounts/AccountsScreen';
 import ExpenseListScreen from '../screens/expense/ExpenseListScreen';
-import BudgetScreen from '../screens/budget/BudgetScreen';
 import ReportsScreen from '../screens/reports/ReportsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import { COLORS } from '../constants/colors';
@@ -13,8 +13,8 @@ const Tab = createBottomTabNavigator();
 const getTabIcon = (routeName, focused) => {
   const icons = {
     Home: focused ? 'home' : 'home-outline',
+    Accounts: focused ? 'people' : 'people-outline',
     Expenses: focused ? 'wallet' : 'wallet-outline',
-    Budget: focused ? 'pie-chart' : 'pie-chart-outline',
     Reports: focused ? 'bar-chart' : 'bar-chart-outline',
     Settings: focused ? 'settings' : 'settings-outline',
   };
@@ -49,8 +49,8 @@ const BottomTabNavigator = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Accounts" component={AccountsScreen} />
       <Tab.Screen name="Expenses" component={ExpenseListScreen} />
-      <Tab.Screen name="Budget" component={BudgetScreen} />
       <Tab.Screen name="Reports" component={ReportsScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>

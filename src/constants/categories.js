@@ -34,6 +34,7 @@ export const EARNING_TYPES = [
 export const ENTRY_TYPES = [
   { id: 'salary', label: 'Salary', icon: 'cash-outline', color: '#4CAF50', type: 'earning' },
   { id: 'expense', label: 'Expense', icon: 'cart-outline', color: '#F44336', type: 'spending' },
+  { id: 'investment', label: 'Investment', icon: 'trending-up-outline', color: '#7C4DFF', type: 'spending' },
   { id: 'freelance', label: 'Freelance', icon: 'laptop-outline', color: '#2196F3', type: 'earning' },
   { id: 'bills', label: 'Bills', icon: 'flash-outline', color: '#FF9800', type: 'spending' },
 ];

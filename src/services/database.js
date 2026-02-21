@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 const DB_NAME = 'dailyexpense.db';
-const DB_VERSION = 5;
+const DB_VERSION = 7;
 
 let db = null;
 
@@ -28,6 +28,7 @@ export const initializeDatabase = async () => {
     await database.execAsync('DROP TABLE IF EXISTS entries');
     await database.execAsync('DROP TABLE IF EXISTS budgets');
     await database.execAsync('DROP TABLE IF EXISTS categories');
+    await database.execAsync('DROP TABLE IF EXISTS persons');
     await database.execAsync(`PRAGMA user_version = ${DB_VERSION}`);
   }
 
@@ -66,9 +67,11 @@ export const initializeDatabase = async () => {
       is_recurring INTEGER DEFAULT 0,
       invoice_uri TEXT,
       invoice_type TEXT,
+      person_id INTEGER,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (category_id) REFERENCES categories(id)
+      FOREIGN KEY (category_id) REFERENCES categories(id),
+      FOREIGN KEY (person_id) REFERENCES persons(id)
     );
   `);
 
@@ -83,6 +86,16 @@ export const initializeDatabase = async () => {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (category_id) REFERENCES categories(id)
+    );
+  `);
+
+  await database.execAsync(`
+    CREATE TABLE IF NOT EXISTS persons (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
     );
   `);
 

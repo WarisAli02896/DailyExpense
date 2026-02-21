@@ -131,6 +131,9 @@ const EntryDetailScreen = ({ route, navigation }) => {
         {entry.company_name && (
           <DetailRow icon="business-outline" label="Company" value={entry.company_name} />
         )}
+        {entry.person_name && (
+          <DetailRow icon="person-outline" label="Account" value={entry.person_name} />
+        )}
         <DetailRow icon="calendar-outline" label="Date" value={dateDisplay} />
         {timeDisplay ? <DetailRow icon="time-outline" label="Time" value={timeDisplay} /> : null}
         <DetailRow

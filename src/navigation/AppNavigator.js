@@ -4,7 +4,10 @@ import BottomTabNavigator from './BottomTabNavigator';
 import AddEntryScreen from '../screens/expense/AddEntryScreen';
 import SalaryFormScreen from '../screens/expense/SalaryFormScreen';
 import AddExpenseScreen from '../screens/expense/AddExpenseScreen';
+import InvestmentFormScreen from '../screens/expense/InvestmentFormScreen';
 import EntryDetailScreen from '../screens/expense/EntryDetailScreen';
+import AccountsScreen from '../screens/accounts/AccountsScreen';
+import AccountSummaryScreen from '../screens/accounts/AccountSummaryScreen';
 import ProfileScreen from '../screens/settings/ProfileScreen';
 import { COLORS } from '../constants/colors';
 
@@ -41,9 +44,24 @@ const AppNavigator = () => {
         options={{ title: 'Add Expense' }}
       />
       <Stack.Screen
+        name="InvestmentForm"
+        component={InvestmentFormScreen}
+        options={{ title: 'Add Investment' }}
+      />
+      <Stack.Screen
         name="EntryDetail"
         component={EntryDetailScreen}
         options={{ title: 'Entry Details' }}
+      />
+      <Stack.Screen
+        name="Accounts"
+        component={AccountsScreen}
+        options={{ title: 'Accounts' }}
+      />
+      <Stack.Screen
+        name="AccountSummary"
+        component={AccountSummaryScreen}
+        options={{ title: 'Account Summary' }}
       />
       <Stack.Screen
         name="Profile"

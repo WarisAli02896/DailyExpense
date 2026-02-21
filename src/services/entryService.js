@@ -1,15 +1,15 @@
 import { getDBConnection } from './database';
 import { formatDateForDB } from '../utils/dateUtils';
 
-export const addEntry = async ({ userId, type, entryType, title, amount, companyName, categoryId, date, notes, isRecurring, invoiceUri, invoiceType }) => {
+export const addEntry = async ({ userId, type, entryType, title, amount, companyName, categoryId, date, notes, isRecurring, invoiceUri, invoiceType, personId }) => {
   try {
     const db = await getDBConnection();
     const dateStr = date || formatDateForDB(new Date());
 
     const result = await db.runAsync(
-      `INSERT INTO entries (user_id, type, entry_type, title, amount, company_name, category_id, date, notes, is_recurring, invoice_uri, invoice_type)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, type, entryType, title, amount, companyName || null, categoryId || null, dateStr, notes || null, isRecurring ? 1 : 0, invoiceUri || null, invoiceType || null]
+      `INSERT INTO entries (user_id, type, entry_type, title, amount, company_name, category_id, date, notes, is_recurring, invoice_uri, invoice_type, person_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, type, entryType, title, amount, companyName || null, categoryId || null, dateStr, notes || null, isRecurring ? 1 : 0, invoiceUri || null, invoiceType || null, personId || null]
     );
 
     return { success: true, message: 'Entry added successfully!', data: { id: result.lastInsertRowId } };
@@ -26,9 +26,10 @@ export const getEntriesByMonth = async (userId, month, year) => {
     const yyyy = String(year);
 
     const entries = await db.getAllAsync(
-      `SELECT e.*, c.name as category_name, c.icon as category_icon, c.color as category_color
+      `SELECT e.*, c.name as category_name, c.icon as category_icon, c.color as category_color, p.name as person_name
        FROM entries e
        LEFT JOIN categories c ON e.category_id = c.id
+       LEFT JOIN persons p ON e.person_id = p.id
        WHERE e.user_id = ? AND strftime('%m', e.date) = ? AND strftime('%Y', e.date) = ?
        ORDER BY e.date DESC, e.created_at DESC`,
       [userId, mm, yyyy]

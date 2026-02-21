@@ -1,0 +1,313 @@
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Pressable,
+  Alert,
+  RefreshControl,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { COLORS } from '../../constants/colors';
+import { FONTS } from '../../constants/fonts';
+import { getPersonEntries } from '../../services/personService';
+import { deleteEntry } from '../../services/entryService';
+import { formatAmount } from '../../utils/currencyUtils';
+import { getMonthName, formatTime12h } from '../../utils/dateUtils';
+
+const INVEST_COLOR = '#7C4DFF';
+
+const AccountSummaryScreen = ({ route, navigation }) => {
+  const { person } = route.params;
+  const [entries, setEntries] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadEntries = useCallback(async () => {
+    const result = await getPersonEntries(person.id);
+    if (result.success) setEntries(result.data);
+  }, [person.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadEntries();
+    }, [loadEntries])
+  );
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadEntries();
+    setRefreshing(false);
+  };
+
+  const totalInvested = entries.reduce((sum, e) => sum + (e.amount || 0), 0);
+
+  const handleDelete = (entry) => {
+    Alert.alert(
+      'Delete Entry',
+      `Remove this investment of Rs. ${formatAmount(entry.amount)}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deleteEntry(entry.id);
+            if (result.success) loadEntries();
+            else Alert.alert('Error', 'Failed to delete entry.');
+          },
+        },
+      ]
+    );
+  };
+
+  const formatEntryDate = (dateStr) => {
+    const d = new Date(dateStr);
+    return `${String(d.getDate()).padStart(2, '0')} ${getMonthName(d.getMonth() + 1)} ${d.getFullYear()}`;
+  };
+
+  const renderEntry = ({ item }) => {
+    const dateLabel = formatEntryDate(item.date);
+    const timeLabel = formatTime12h(item.date);
+    const hasInvoice = !!item.invoice_uri;
+
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.entryRow, pressed && styles.entryRowPressed]}
+        onPress={() => navigation.navigate('EntryDetail', { entry: { ...item, person_name: person.name } })}
+        role="button"
+      >
+        <View style={styles.entryIcon}>
+          <Ionicons name="trending-up" size={20} color={INVEST_COLOR} />
+        </View>
+        <View style={styles.entryInfo}>
+          <Text style={styles.entryTitle} numberOfLines={1}>{item.title}</Text>
+          <Text style={styles.entryDate}>{dateLabel} · {timeLabel}</Text>
+          {hasInvoice && (
+            <View style={styles.invoiceTag}>
+              <Ionicons name="attach" size={12} color={COLORS.textSecondary} />
+              <Text style={styles.invoiceTagText}>Invoice</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.entryRight}>
+          <Text style={styles.entryAmount}>Rs. {formatAmount(item.amount)}</Text>
+          <Pressable
+            style={({ pressed }) => [styles.entryDeleteBtn, pressed && { opacity: 0.5 }]}
+            onPress={(e) => { e.stopPropagation(); handleDelete(item); }}
+            role="button"
+            hitSlop={8}
+          >
+            <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
+          </Pressable>
+        </View>
+      </Pressable>
+    );
+  };
+
+  const initial = person.name.charAt(0).toUpperCase();
+
+  return (
+    <View style={styles.container}>
+      {/* Person Header Card */}
+      <View style={styles.headerCard}>
+        <View style={styles.headerAvatar}>
+          <Text style={styles.headerAvatarText}>{initial}</Text>
+        </View>
+        <View style={styles.headerInfo}>
+          <Text style={styles.headerName}>{person.name}</Text>
+          <Text style={styles.headerMeta}>
+            {entries.length} {entries.length === 1 ? 'investment' : 'investments'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Total Amount Card */}
+      <View style={styles.totalCard}>
+        <Text style={styles.totalLabel}>Total Invested</Text>
+        <Text style={styles.totalAmount}>Rs. {formatAmount(totalInvested)}</Text>
+      </View>
+
+      {/* Entries List */}
+      <View style={styles.listHeader}>
+        <Text style={styles.listTitle}>Investment History</Text>
+      </View>
+
+      <FlatList
+        data={entries}
+        renderItem={renderEntry}
+        keyExtractor={(item) => String(item.id)}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={INVEST_COLOR}
+            colors={[INVEST_COLOR]}
+          />
+        }
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="document-text-outline" size={50} color={COLORS.textLight} />
+            <Text style={styles.emptyTitle}>No investments yet</Text>
+            <Text style={styles.emptyText}>Investments linked to {person.name} will appear here</Text>
+          </View>
+        }
+      />
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  headerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: INVEST_COLOR,
+    padding: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+    gap: 16,
+  },
+  headerAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerAvatarText: {
+    fontSize: 24,
+    fontWeight: FONTS.weights.bold,
+    color: COLORS.textWhite,
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  headerName: {
+    fontSize: FONTS.sizes.xl,
+    fontWeight: FONTS.weights.bold,
+    color: COLORS.textWhite,
+  },
+  headerMeta: {
+    fontSize: FONTS.sizes.sm,
+    color: 'rgba(255,255,255,0.75)',
+    marginTop: 2,
+  },
+  totalCard: {
+    backgroundColor: COLORS.surface,
+    marginHorizontal: 20,
+    marginTop: -1,
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+    transform: [{ translateY: -12 }],
+  },
+  totalLabel: {
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  totalAmount: {
+    fontSize: 30,
+    fontWeight: FONTS.weights.extraBold,
+    color: INVEST_COLOR,
+  },
+  listHeader: {
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  listTitle: {
+    fontSize: FONTS.sizes.lg,
+    fontWeight: FONTS.weights.bold,
+    color: COLORS.text,
+  },
+  listContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+  },
+  entryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.06)',
+  },
+  entryRowPressed: {
+    backgroundColor: COLORS.borderLight,
+  },
+  entryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: INVEST_COLOR + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  entryInfo: {
+    flex: 1,
+  },
+  entryTitle: {
+    fontSize: FONTS.sizes.base,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.text,
+  },
+  entryDate: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  invoiceTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 4,
+  },
+  invoiceTagText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+  },
+  entryRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  entryAmount: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.bold,
+    color: INVEST_COLOR,
+  },
+  entryDeleteBtn: {
+    padding: 4,
+    borderRadius: 8,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  emptyTitle: {
+    fontSize: FONTS.sizes.lg,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.textSecondary,
+    marginTop: 12,
+  },
+  emptyText: {
+    fontSize: FONTS.sizes.md,
+    color: COLORS.textLight,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+});
+
+export default AccountSummaryScreen;
