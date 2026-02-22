@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './context/AuthContext';
 import { ExpenseProvider } from './context/ExpenseContext';
 import RootNavigator from './navigation';
@@ -44,12 +45,14 @@ const App = () => {
   }
 
   return (
-    <AuthProvider>
-      <ExpenseProvider>
-        <StatusBar style="auto" />
-        <RootNavigator />
-      </ExpenseProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <ExpenseProvider>
+          <StatusBar style="auto" />
+          <RootNavigator />
+        </ExpenseProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 };
 
