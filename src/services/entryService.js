@@ -67,6 +67,30 @@ export const getEntriesByType = async (userId, type, month, year) => {
   }
 };
 
+export const getEntriesByEntryType = async (userId, entryType, month, year) => {
+  try {
+    const db = await getDBConnection();
+    const mm = String(month).padStart(2, '0');
+    const yyyy = String(year);
+
+    const entries = await db.getAllAsync(
+      `SELECT e.*, c.name as category_name, c.icon as category_icon, c.color as category_color, p.name as person_name
+       FROM entries e
+       LEFT JOIN categories c ON e.category_id = c.id
+       LEFT JOIN persons p ON e.person_id = p.id
+       WHERE e.user_id = ? AND e.entry_type = ? AND strftime('%m', e.date) = ? AND strftime('%Y', e.date) = ?
+       ORDER BY e.date DESC, e.created_at DESC`,
+      [userId, entryType, mm, yyyy]
+    );
+
+    const total = entries.reduce((sum, e) => sum + e.amount, 0);
+    return { success: true, data: entries, total };
+  } catch (error) {
+    console.error('Get Entries By Entry Type Error:', error);
+    return { success: false, data: [], total: 0 };
+  }
+};
+
 export const getMonthSummary = async (userId, month, year) => {
   try {
     const db = await getDBConnection();

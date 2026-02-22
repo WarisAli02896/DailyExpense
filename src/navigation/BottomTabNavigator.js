@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/home/HomeScreen';
 import EarningListScreen from '../screens/earning/EarningListScreen';
 import ExpenseListScreen from '../screens/expense/ExpenseListScreen';
+import BillListScreen from '../screens/bills/BillListScreen';
 import AccountsScreen from '../screens/accounts/AccountsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import { COLORS } from '../constants/colors';
@@ -17,6 +18,7 @@ const getTabIcon = (routeName, focused) => {
     Home: focused ? 'home' : 'home-outline',
     Earnings: focused ? 'trending-up' : 'trending-up-outline',
     Expenses: focused ? 'wallet' : 'wallet-outline',
+    Bills: focused ? 'flash' : 'flash-outline',
     Accounts: focused ? 'people' : 'people-outline',
     Settings: focused ? 'settings' : 'settings-outline',
   };
@@ -56,6 +58,7 @@ const BottomTabNavigator = () => {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Earnings" component={EarningListScreen} />
       <Tab.Screen name="Expenses" component={ExpenseListScreen} />
+      <Tab.Screen name="Bills" component={BillListScreen} />
       <Tab.Screen name="Accounts" component={AccountsScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
