@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
-  Alert,
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +14,7 @@ import { FONTS } from '../../constants/fonts';
 import { useAuth } from '../../hooks/useAuth';
 import { addPerson, getPersons, deletePerson } from '../../services/personService';
 import { formatAmount } from '../../utils/currencyUtils';
+import { showAlert, showConfirm } from '../../utils/alertUtils';
 
 const INVEST_COLOR = '#7C4DFF';
 
@@ -42,7 +42,7 @@ const AccountsScreen = () => {
 
   const handleAdd = async () => {
     if (!newName.trim()) {
-      Alert.alert('Error', 'Please enter a person name.');
+      showAlert('Error', 'Please enter a person name.');
       return;
     }
 
@@ -53,27 +53,20 @@ const AccountsScreen = () => {
       setShowInput(false);
       loadPersons();
     } else {
-      Alert.alert('Error', result.message);
+      showAlert('Error', result.message);
     }
     setAdding(false);
   };
 
   const handleDelete = (e, person) => {
     e.stopPropagation();
-    Alert.alert(
+    showConfirm(
       'Delete Account',
       `Remove "${person.name}" from your accounts?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await deletePerson(person.id);
-            if (result.success) loadPersons();
-          },
-        },
-      ]
+      async () => {
+        const result = await deletePerson(person.id);
+        if (result.success) loadPersons();
+      }
     );
   };
 

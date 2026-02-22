@@ -6,26 +6,58 @@ import {
   ScrollView,
   Image,
   Pressable,
-  Alert,
+  TextInput,
+  Switch,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
+import { ENTRY_TYPES } from '../../constants/categories';
 import { formatAmount } from '../../utils/currencyUtils';
 import { getMonthName, formatTime12h } from '../../utils/dateUtils';
-import { deleteEntry } from '../../services/entryService';
-import { Button } from '../../components/common';
+import { deleteEntry, updateEntry } from '../../services/entryService';
+import { pickInvoice, saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
+import { Button, Dropdown } from '../../components/common';
+import { showAlert, showConfirm } from '../../utils/alertUtils';
+
+const TYPE_OPTIONS = [
+  { value: 'earning', label: 'Earning', icon: 'arrow-down-circle-outline' },
+  { value: 'spending', label: 'Spending', icon: 'arrow-up-circle-outline' },
+];
+
+const ENTRY_TYPE_OPTIONS = ENTRY_TYPES.map((t) => ({
+  value: t.id,
+  label: t.label,
+  icon: t.icon,
+}));
 
 const EntryDetailScreen = ({ route, navigation }) => {
-  const { entry } = route.params;
+  const { entry: initialEntry } = route.params;
+  const [entry, setEntry] = useState(initialEntry);
+  const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [editType, setEditType] = useState(entry.type);
+  const [editEntryType, setEditEntryType] = useState(entry.entry_type);
+  const [editTitle, setEditTitle] = useState(entry.title);
+  const [editAmount, setEditAmount] = useState(String(entry.amount));
+  const [editCompany, setEditCompany] = useState(entry.company_name || '');
+  const [editNotes, setEditNotes] = useState(entry.notes || '');
+  const [editRecurring, setEditRecurring] = useState(!!entry.is_recurring);
+  const [editInvoice, setEditInvoice] = useState(null);
+  const [invoiceRemoved, setInvoiceRemoved] = useState(false);
 
   const isEarning = entry.type === 'earning';
+  const editIsEarning = editType === 'earning';
   const entryDate = new Date(entry.date);
   const dateDisplay = `${String(entryDate.getDate()).padStart(2, '0')} ${getMonthName(entryDate.getMonth() + 1)} ${entryDate.getFullYear()}`;
   const timeDisplay = formatTime12h(entry.date);
+  const accentColor = editing
+    ? (editIsEarning ? COLORS.income : COLORS.expense)
+    : (isEarning ? COLORS.income : COLORS.expense);
 
   const hasInvoice = !!entry.invoice_uri;
   const mime = (entry.invoice_type || '').toLowerCase();
@@ -33,15 +65,10 @@ const EntryDetailScreen = ({ route, navigation }) => {
 
   const getDocInfo = () => {
     if (!hasInvoice || invoiceIsImage) return null;
-    if (mime.includes('pdf')) {
-      return { label: 'PDF Document', icon: 'document-text', color: '#E53935' };
-    }
-    if (mime.includes('word') || mime.includes('document') || mime.includes('msword')) {
-      return { label: 'Word Document', icon: 'document', color: '#1565C0' };
-    }
+    if (mime.includes('pdf')) return { label: 'PDF Document', icon: 'document-text', color: '#E53935' };
+    if (mime.includes('word') || mime.includes('document') || mime.includes('msword')) return { label: 'Word Document', icon: 'document', color: '#1565C0' };
     return { label: 'Document', icon: 'document-attach', color: COLORS.textSecondary };
   };
-
   const docInfo = getDocInfo();
 
   const getFileName = () => {
@@ -68,97 +95,334 @@ const EntryDetailScreen = ({ route, navigation }) => {
             dialogTitle: 'Save Invoice',
           });
         } else {
-          Alert.alert('Error', 'Sharing is not available on this device.');
+          showAlert('Error', 'Sharing is not available on this device.');
         }
       }
     } catch (error) {
-      Alert.alert('Error', 'Could not download file. The file may no longer be available.');
+      showAlert('Error', 'Could not download file. The file may no longer be available.');
     }
   };
 
   const handleDelete = () => {
-    Alert.alert(
+    showConfirm(
       'Delete Entry',
       `Are you sure you want to delete "${entry.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            const result = await deleteEntry(entry.id);
-            if (result.success) {
-              navigation.goBack();
-            } else {
-              Alert.alert('Error', 'Failed to delete entry.');
-              setDeleting(false);
-            }
-          },
-        },
-      ]
+      async () => {
+        setDeleting(true);
+        const result = await deleteEntry(entry.id);
+        if (result.success) {
+          navigation.goBack();
+        } else {
+          showAlert('Error', 'Failed to delete entry.');
+          setDeleting(false);
+        }
+      }
     );
+  };
+
+  const startEditing = () => {
+    setEditType(entry.type);
+    setEditEntryType(entry.entry_type);
+    setEditTitle(entry.title);
+    setEditAmount(String(entry.amount));
+    setEditCompany(entry.company_name || '');
+    setEditNotes(entry.notes || '');
+    setEditRecurring(!!entry.is_recurring);
+    setEditInvoice(null);
+    setInvoiceRemoved(false);
+    setEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setEditInvoice(null);
+    setInvoiceRemoved(false);
+    setEditing(false);
+  };
+
+  const handleAmountChange = (text) => {
+    const filtered = text.replace(/[^0-9.]/g, '');
+    const parts = filtered.split('.');
+    setEditAmount(parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : filtered);
+  };
+
+  const handlePickNewInvoice = async () => {
+    const result = await pickInvoice();
+    if (result.success) {
+      setEditInvoice(result.file);
+      setInvoiceRemoved(false);
+    } else if (!result.canceled) {
+      showAlert('Error', result.message || 'Could not pick file.');
+    }
+  };
+
+  const handleRemoveInvoice = () => {
+    setEditInvoice(null);
+    setInvoiceRemoved(true);
+  };
+
+  const handleSave = async () => {
+    if (!editTitle.trim()) { showAlert('Error', 'Title is required.'); return; }
+    if (!editAmount.trim() || parseFloat(editAmount) <= 0) { showAlert('Error', 'Enter a valid amount greater than 0.'); return; }
+
+    setSaving(true);
+    try {
+      const updateFields = {
+        type: editType,
+        entryType: editEntryType,
+        title: editTitle.trim(),
+        amount: parseFloat(editAmount),
+        companyName: editCompany.trim() || null,
+        notes: editNotes.trim() || null,
+        isRecurring: editRecurring,
+      };
+
+      if (editInvoice) {
+        const savedUri = await saveInvoice(editInvoice.uri, editInvoice.name);
+        updateFields.invoiceUri = savedUri;
+        updateFields.invoiceType = editInvoice.mimeType || null;
+      } else if (invoiceRemoved) {
+        updateFields.invoiceUri = null;
+        updateFields.invoiceType = null;
+      }
+
+      const result = await updateEntry(entry.id, updateFields);
+
+      if (result.success) {
+        setEntry(result.data);
+        setEditInvoice(null);
+        setInvoiceRemoved(false);
+        setEditing(false);
+        showAlert('Success', 'Entry updated successfully!');
+      } else {
+        showAlert('Error', result.message);
+      }
+    } catch (error) {
+      showAlert('Error', 'Failed to save changes.');
+    }
+    setSaving(false);
+  };
+
+  const entryTypeLabel = (val) => {
+    const found = ENTRY_TYPES.find((t) => t.id === val);
+    return found ? found.label : val?.charAt(0).toUpperCase() + val?.slice(1);
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      {/* Type Badge */}
-      <View style={[styles.typeBadge, isEarning ? styles.earningBadge : styles.spendingBadge]}>
-        <Ionicons
-          name={isEarning ? 'arrow-down-circle' : 'arrow-up-circle'}
-          size={20}
-          color={isEarning ? COLORS.income : COLORS.expense}
-        />
-        <Text style={[styles.typeBadgeText, { color: isEarning ? COLORS.income : COLORS.expense }]}>
-          {isEarning ? 'Earning' : 'Spending'}
-        </Text>
+      {/* Top Row: Badge + Edit */}
+      <View style={styles.topRow}>
+        <View style={[styles.typeBadge, { backgroundColor: accentColor + '14' }]}>
+          <Ionicons
+            name={(editing ? editIsEarning : isEarning) ? 'arrow-down-circle' : 'arrow-up-circle'}
+            size={20}
+            color={accentColor}
+          />
+          <Text style={[styles.typeBadgeText, { color: accentColor }]}>
+            {(editing ? editIsEarning : isEarning) ? 'Earning' : 'Spending'}
+          </Text>
+        </View>
+        {!editing && (
+          <Pressable
+            style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.7 }]}
+            onPress={startEditing}
+            role="button"
+          >
+            <Ionicons name="create-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.editBtnText}>Edit</Text>
+          </Pressable>
+        )}
       </View>
 
-      {/* Amount Card */}
-      <View style={[styles.amountCard, isEarning ? styles.earningCard : styles.spendingCard]}>
-        <Text style={styles.amountLabel}>{isEarning ? 'Amount Earned' : 'Amount Spent'}</Text>
-        <Text style={styles.amountValue}>
-          {isEarning ? '+' : '-'} Rs. {formatAmount(entry.amount)}
-        </Text>
-      </View>
+      {/* Amount */}
+      {editing ? (
+        <View style={[styles.amountEditCard, { borderColor: accentColor + '40' }]}>
+          <Text style={[styles.amountEditLabel, { color: accentColor }]}>
+            {editIsEarning ? 'Amount Earned' : 'Amount Spent'}
+          </Text>
+          <View style={styles.amountEditRow}>
+            <Text style={[styles.amountEditCurrency, { color: accentColor }]}>Rs.</Text>
+            <TextInput
+              style={[styles.amountEditInput, { color: accentColor, borderBottomColor: accentColor + '30' }]}
+              value={editAmount}
+              onChangeText={handleAmountChange}
+              keyboardType="numeric"
+              placeholder="0.00"
+              placeholderTextColor={COLORS.textLight}
+            />
+          </View>
+        </View>
+      ) : (
+        <View style={[styles.amountCard, { backgroundColor: accentColor }]}>
+          <Text style={styles.amountLabel}>{isEarning ? 'Amount Earned' : 'Amount Spent'}</Text>
+          <Text style={styles.amountValue}>
+            {isEarning ? '+' : '-'} Rs. {formatAmount(entry.amount)}
+          </Text>
+        </View>
+      )}
 
-      {/* Details Section */}
+      {/* Details */}
       <View style={styles.detailsCard}>
         <Text style={styles.sectionTitle}>Details</Text>
 
-        <DetailRow icon="document-text-outline" label="Title" value={entry.title} />
-        <DetailRow icon="briefcase-outline" label="Type" value={entry.entry_type?.charAt(0).toUpperCase() + entry.entry_type?.slice(1)} />
-        {entry.company_name && (
-          <DetailRow icon="business-outline" label="Company" value={entry.company_name} />
-        )}
-        {entry.person_name && (
-          <DetailRow icon="person-outline" label="Account" value={entry.person_name} />
-        )}
-        <DetailRow icon="calendar-outline" label="Date" value={dateDisplay} />
-        {timeDisplay ? <DetailRow icon="time-outline" label="Time" value={timeDisplay} /> : null}
-        <DetailRow
-          icon="repeat-outline"
-          label="Recurring"
-          value={entry.is_recurring ? 'Yes — Monthly' : 'No'}
-        />
-        {entry.notes && (
-          <DetailRow icon="chatbox-ellipses-outline" label="Notes" value={entry.notes} />
+        {editing ? (
+          <View>
+            {/* Type Toggle */}
+            <Text style={styles.editFieldLabel}>Type</Text>
+            <View style={styles.toggleRow}>
+              {TYPE_OPTIONS.map((opt) => {
+                const selected = editType === opt.value;
+                const color = opt.value === 'earning' ? COLORS.income : COLORS.expense;
+                return (
+                  <Pressable
+                    key={opt.value}
+                    style={[styles.toggleOption, selected && { backgroundColor: color + '14', borderColor: color }]}
+                    onPress={() => setEditType(opt.value)}
+                    role="button"
+                  >
+                    <Ionicons name={opt.icon} size={18} color={selected ? color : COLORS.textLight} />
+                    <Text style={[styles.toggleOptionText, selected && { color, fontWeight: FONTS.weights.bold }]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/* Entry Type Dropdown */}
+            <Dropdown
+              label="Category"
+              value={editEntryType}
+              options={ENTRY_TYPE_OPTIONS}
+              onSelect={setEditEntryType}
+              placeholder="Select entry type"
+            />
+
+            {/* Title */}
+            <EditField label="Title" value={editTitle} onChangeText={setEditTitle} placeholder="Entry title" />
+
+            {/* Company */}
+            <EditField label="Company" value={editCompany} onChangeText={setEditCompany} placeholder="Company name (optional)" />
+
+            {/* Account (read-only) */}
+            {entry.person_name && (
+              <DetailRow icon="person-outline" label="Account" value={entry.person_name} />
+            )}
+
+            {/* Date & Time (read-only) */}
+            <DetailRow icon="calendar-outline" label="Date" value={dateDisplay} />
+            {timeDisplay ? <DetailRow icon="time-outline" label="Time" value={timeDisplay} /> : null}
+
+            {/* Recurring Toggle */}
+            <View style={styles.recurringRow}>
+              <View style={styles.recurringLeft}>
+                <View style={styles.recurringIconWrap}>
+                  <Ionicons name="repeat" size={18} color={COLORS.primary} />
+                </View>
+                <View>
+                  <Text style={styles.recurringLabel}>Monthly Recurring</Text>
+                  <Text style={styles.recurringHint}>Repeat this entry every month</Text>
+                </View>
+              </View>
+              <Switch
+                value={editRecurring}
+                onValueChange={setEditRecurring}
+                trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
+                thumbColor={editRecurring ? COLORS.primary : COLORS.textLight}
+              />
+            </View>
+
+            {/* Notes */}
+            <EditField label="Notes" value={editNotes} onChangeText={setEditNotes} placeholder="Add notes (optional)" multiline />
+          </View>
+        ) : (
+          <>
+            <DetailRow icon="document-text-outline" label="Title" value={entry.title} />
+            <DetailRow icon="briefcase-outline" label="Type" value={entryTypeLabel(entry.entry_type)} />
+            {entry.company_name ? <DetailRow icon="business-outline" label="Company" value={entry.company_name} /> : null}
+            {entry.person_name ? <DetailRow icon="person-outline" label="Account" value={entry.person_name} /> : null}
+            <DetailRow icon="calendar-outline" label="Date" value={dateDisplay} />
+            {timeDisplay ? <DetailRow icon="time-outline" label="Time" value={timeDisplay} /> : null}
+            <DetailRow icon="repeat-outline" label="Recurring" value={entry.is_recurring ? 'Yes — Monthly' : 'No'} />
+            {entry.notes ? <DetailRow icon="chatbox-ellipses-outline" label="Notes" value={entry.notes} /> : null}
+          </>
         )}
       </View>
 
-      {/* Invoice Section */}
-      {hasInvoice && (
+      {/* Invoice / Receipt */}
+      {editing ? (
         <View style={styles.invoiceCard}>
           <Text style={styles.sectionTitle}>Invoice / Receipt</Text>
 
+          {editInvoice ? (
+            <View style={styles.invoicePreviewRow}>
+              <View style={styles.invoicePreviewLeft}>
+                {getFileType(editInvoice.mimeType) === 'image' ? (
+                  <Image source={{ uri: editInvoice.uri }} style={styles.invoiceThumbnail} />
+                ) : (
+                  <View style={[styles.invoiceFileIcon, getFileType(editInvoice.mimeType) === 'pdf' ? styles.pdfBg : styles.docBg]}>
+                    <Ionicons name={getFileType(editInvoice.mimeType) === 'pdf' ? 'document-text' : 'document'} size={24} color={COLORS.textWhite} />
+                  </View>
+                )}
+                <View style={styles.invoicePreviewInfo}>
+                  <Text style={styles.invoicePreviewName} numberOfLines={1}>{editInvoice.name}</Text>
+                  <Text style={styles.invoicePreviewSize}>{formatFileSize(editInvoice.size)}</Text>
+                </View>
+              </View>
+              <Pressable
+                style={({ pressed }) => [styles.invoiceRemoveBtn, pressed && { opacity: 0.6 }]}
+                onPress={() => setEditInvoice(null)}
+                role="button"
+                hitSlop={8}
+              >
+                <Ionicons name="close-circle" size={24} color={COLORS.danger} />
+              </Pressable>
+            </View>
+          ) : hasInvoice && !invoiceRemoved ? (
+            <View style={styles.invoicePreviewRow}>
+              <View style={styles.invoicePreviewLeft}>
+                {invoiceIsImage ? (
+                  <Image source={{ uri: entry.invoice_uri }} style={styles.invoiceThumbnail} />
+                ) : (
+                  <View style={[styles.invoiceFileIcon, docInfo ? { backgroundColor: docInfo.color } : styles.docBg]}>
+                    <Ionicons name={docInfo?.icon || 'document-attach'} size={24} color={COLORS.textWhite} />
+                  </View>
+                )}
+                <View style={styles.invoicePreviewInfo}>
+                  <Text style={styles.invoicePreviewName} numberOfLines={1}>{getFileName()}</Text>
+                  <Text style={styles.invoicePreviewSize}>Current attachment</Text>
+                </View>
+              </View>
+              <Pressable
+                style={({ pressed }) => [styles.invoiceRemoveBtn, pressed && { opacity: 0.6 }]}
+                onPress={handleRemoveInvoice}
+                role="button"
+                hitSlop={8}
+              >
+                <Ionicons name="close-circle" size={24} color={COLORS.danger} />
+              </Pressable>
+            </View>
+          ) : null}
+
+          <View style={styles.invoiceEditActions}>
+            <Pressable
+              style={({ pressed }) => [styles.invoicePickBtn, pressed && { opacity: 0.8 }]}
+              onPress={handlePickNewInvoice}
+              role="button"
+            >
+              <Ionicons name="cloud-upload-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.invoicePickBtnText}>
+                {(hasInvoice && !invoiceRemoved) || editInvoice ? 'Replace File' : 'Attach File'}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : hasInvoice ? (
+        <View style={styles.invoiceCard}>
+          <Text style={styles.sectionTitle}>Invoice / Receipt</Text>
           {invoiceIsImage ? (
             <View style={styles.imageSection}>
               <View style={styles.imageContainer}>
-                <Image
-                  source={{ uri: entry.invoice_uri }}
-                  style={styles.invoiceImage}
-                  resizeMode="contain"
-                />
+                <Image source={{ uri: entry.invoice_uri }} style={styles.invoiceImage} resizeMode="contain" />
               </View>
               <Pressable
                 style={({ pressed }) => [styles.downloadBtn, styles.downloadImageBtn, pressed && { opacity: 0.8 }]}
@@ -175,9 +439,7 @@ const EntryDetailScreen = ({ route, navigation }) => {
                 <Ionicons name={docInfo.icon} size={36} color={COLORS.textWhite} />
               </View>
               <Text style={styles.docLabel}>{docInfo.label}</Text>
-              <Text style={styles.docFileName} numberOfLines={2}>
-                {getFileName()}
-              </Text>
+              <Text style={styles.docFileName} numberOfLines={2}>{getFileName()}</Text>
               <Pressable
                 style={({ pressed }) => [styles.downloadBtn, pressed && { opacity: 0.8 }]}
                 onPress={handleDownload}
@@ -189,16 +451,29 @@ const EntryDetailScreen = ({ route, navigation }) => {
             </View>
           ) : null}
         </View>
-      )}
+      ) : null}
 
-      {/* Delete */}
-      <Button
-        title="Delete Entry"
-        onPress={handleDelete}
-        loading={deleting}
-        style={styles.deleteBtn}
-        textStyle={styles.deleteBtnText}
-      />
+      {/* Actions */}
+      {editing ? (
+        <View style={styles.editActions}>
+          <Pressable
+            style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+            onPress={cancelEditing}
+            role="button"
+          >
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </Pressable>
+          <Button title="Save Changes" onPress={handleSave} loading={saving} style={styles.saveBtn} />
+        </View>
+      ) : (
+        <Button
+          title="Delete Entry"
+          onPress={handleDelete}
+          loading={deleting}
+          style={styles.deleteButton}
+          textStyle={styles.deleteBtnText}
+        />
+      )}
     </ScrollView>
   );
 };
@@ -215,165 +490,155 @@ const DetailRow = ({ icon, label, value }) => (
   </View>
 );
 
+const EditField = ({ label, value, onChangeText, placeholder, multiline }) => (
+  <View style={styles.editField}>
+    <Text style={styles.editFieldLabel}>{label}</Text>
+    <TextInput
+      style={[styles.editFieldInput, multiline && styles.editFieldMultiline]}
+      value={value}
+      onChangeText={onChangeText}
+      placeholder={placeholder}
+      placeholderTextColor={COLORS.textLight}
+      multiline={multiline}
+      numberOfLines={multiline ? 3 : 1}
+    />
+  </View>
+);
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+  container: { flex: 1, backgroundColor: COLORS.background },
+  scrollContent: { padding: 20, paddingBottom: 40 },
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     gap: 8,
-    marginBottom: 16,
   },
-  earningBadge: {
-    backgroundColor: COLORS.income + '14',
-  },
-  spendingBadge: {
-    backgroundColor: COLORS.expense + '14',
-  },
-  typeBadgeText: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semiBold,
-  },
-  amountCard: {
-    borderRadius: 18,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  earningCard: {
-    backgroundColor: COLORS.income,
-  },
-  spendingCard: {
-    backgroundColor: COLORS.expense,
-  },
-  amountLabel: {
-    fontSize: FONTS.sizes.md,
-    color: 'rgba(255,255,255,0.75)',
-    marginBottom: 8,
-  },
-  amountValue: {
-    fontSize: 34,
-    fontWeight: FONTS.weights.extraBold,
-    color: COLORS.textWhite,
-  },
-  detailsCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: FONTS.sizes.lg,
-    fontWeight: FONTS.weights.bold,
-    color: COLORS.text,
-    marginBottom: 16,
-  },
-  detailRow: {
+  typeBadgeText: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semiBold },
+  editBtn: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '12',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 6,
   },
+  editBtnText: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semiBold, color: COLORS.primary },
+
+  amountCard: { borderRadius: 18, padding: 24, alignItems: 'center', marginBottom: 20 },
+  amountLabel: { fontSize: FONTS.sizes.md, color: 'rgba(255,255,255,0.75)', marginBottom: 8 },
+  amountValue: { fontSize: 34, fontWeight: FONTS.weights.extraBold, color: COLORS.textWhite },
+
+  amountEditCard: {
+    borderRadius: 18, padding: 24, alignItems: 'center', marginBottom: 20,
+    backgroundColor: COLORS.surface, borderWidth: 2,
+  },
+  amountEditLabel: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.medium, marginBottom: 8 },
+  amountEditRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  amountEditCurrency: { fontSize: 28, fontWeight: FONTS.weights.bold },
+  amountEditInput: {
+    fontSize: 34, fontWeight: FONTS.weights.extraBold, minWidth: 100,
+    textAlign: 'center', paddingVertical: 4, borderBottomWidth: 2,
+  },
+
+  detailsCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 20, marginBottom: 16 },
+  sectionTitle: { fontSize: FONTS.sizes.lg, fontWeight: FONTS.weights.bold, color: COLORS.text, marginBottom: 16 },
+
+  detailRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 },
   detailIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: COLORS.primary + '10',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: COLORS.primary + '10', justifyContent: 'center', alignItems: 'center', marginRight: 14,
   },
-  detailContent: {
-    flex: 1,
+  detailContent: { flex: 1 },
+  detailLabel: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, marginBottom: 2 },
+  detailValue: { fontSize: FONTS.sizes.base, fontWeight: FONTS.weights.medium, color: COLORS.text },
+
+  toggleRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  toggleOption: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 12, borderRadius: 12,
+    backgroundColor: COLORS.background, borderWidth: 1.5, borderColor: COLORS.borderLight,
   },
-  detailLabel: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-    marginBottom: 2,
+  toggleOptionText: { fontSize: FONTS.sizes.md, color: COLORS.textSecondary },
+
+  editField: { marginBottom: 16 },
+  editFieldLabel: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, marginBottom: 6 },
+  editFieldInput: {
+    fontSize: FONTS.sizes.base, color: COLORS.text, backgroundColor: COLORS.background,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12,
+    borderWidth: 1, borderColor: COLORS.primary + '30',
   },
-  detailValue: {
-    fontSize: FONTS.sizes.base,
-    fontWeight: FONTS.weights.medium,
-    color: COLORS.text,
+  editFieldMultiline: { minHeight: 80, textAlignVertical: 'top' },
+
+  recurringRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.background, borderRadius: 14, padding: 14, marginBottom: 16,
+    borderWidth: 1, borderColor: COLORS.borderLight,
   },
-  invoiceCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+  recurringLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  recurringIconWrap: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: COLORS.primary + '14', justifyContent: 'center', alignItems: 'center',
   },
-  imageSection: {
-    alignItems: 'center',
-  },
-  imageContainer: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: COLORS.borderLight,
-    width: '100%',
-  },
-  downloadImageBtn: {
-    marginTop: 16,
-  },
-  invoiceImage: {
-    width: '100%',
-    height: 350,
-    backgroundColor: COLORS.borderLight,
-  },
-  docContainer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-  },
-  docIconBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  docLabel: {
-    fontSize: FONTS.sizes.base,
-    fontWeight: FONTS.weights.semiBold,
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  docFileName: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 18,
-    maxWidth: '80%',
-  },
+  recurringLabel: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semiBold, color: COLORS.text, marginBottom: 2 },
+  recurringHint: { fontSize: FONTS.sizes.xs, color: COLORS.textSecondary },
+
+  invoiceCard: { backgroundColor: COLORS.surface, borderRadius: 16, padding: 20, marginBottom: 16 },
+  imageSection: { alignItems: 'center' },
+  imageContainer: { borderRadius: 12, overflow: 'hidden', backgroundColor: COLORS.borderLight, width: '100%' },
+  downloadImageBtn: { marginTop: 16 },
+  invoiceImage: { width: '100%', height: 350, backgroundColor: COLORS.borderLight },
+  docContainer: { alignItems: 'center', paddingVertical: 20 },
+  docIconBox: { width: 72, height: 72, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  docLabel: { fontSize: FONTS.sizes.base, fontWeight: FONTS.weights.semiBold, color: COLORS.text, marginBottom: 4 },
+  docFileName: { fontSize: FONTS.sizes.sm, color: COLORS.textSecondary, textAlign: 'center', marginBottom: 18, maxWidth: '80%' },
   downloadBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary,
+    paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, gap: 8,
   },
-  downloadBtnText: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semiBold,
-    color: COLORS.textWhite,
+  downloadBtnText: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semiBold, color: COLORS.textWhite },
+
+  editActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  cancelBtn: {
+    flex: 1, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: COLORS.surface, paddingVertical: 16, borderRadius: 14,
+    borderWidth: 1, borderColor: COLORS.border,
   },
-  deleteBtn: {
-    backgroundColor: COLORS.danger,
-    marginTop: 8,
+  cancelBtnText: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semiBold, color: COLORS.textSecondary },
+  saveBtn: { flex: 2 },
+  invoicePreviewRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: COLORS.background, borderRadius: 12, padding: 12, marginBottom: 12,
+    borderWidth: 1, borderColor: COLORS.borderLight,
   },
-  deleteBtnText: {
-    color: COLORS.textWhite,
+  invoicePreviewLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  invoiceThumbnail: { width: 48, height: 48, borderRadius: 10, backgroundColor: COLORS.borderLight },
+  invoiceFileIcon: { width: 48, height: 48, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  pdfBg: { backgroundColor: '#E53935' },
+  docBg: { backgroundColor: '#1565C0' },
+  invoicePreviewInfo: { flex: 1 },
+  invoicePreviewName: { fontSize: FONTS.sizes.sm, fontWeight: FONTS.weights.semiBold, color: COLORS.text, marginBottom: 2 },
+  invoicePreviewSize: { fontSize: FONTS.sizes.xs, color: COLORS.textSecondary },
+  invoiceRemoveBtn: { padding: 4 },
+  invoiceEditActions: { alignItems: 'center' },
+  invoicePickBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: COLORS.primary + '10', paddingHorizontal: 20, paddingVertical: 12,
+    borderRadius: 12, borderWidth: 1, borderColor: COLORS.primary + '25',
   },
+  invoicePickBtnText: { fontSize: FONTS.sizes.md, fontWeight: FONTS.weights.semiBold, color: COLORS.primary },
+
+  deleteButton: { backgroundColor: COLORS.danger, marginTop: 8 },
+  deleteBtnText: { color: COLORS.textWhite },
 });
 
 export default EntryDetailScreen;

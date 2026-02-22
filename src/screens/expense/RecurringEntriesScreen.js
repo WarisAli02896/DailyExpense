@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
-  Alert,
   RefreshControl,
   Modal,
   TextInput,
@@ -17,6 +16,7 @@ import { FONTS } from '../../constants/fonts';
 import { getTemplates, updateTemplate, deleteTemplate } from '../../services/recurringService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatAmount } from '../../utils/currencyUtils';
+import { showAlert, showConfirm } from '../../utils/alertUtils';
 
 const RecurringEntriesScreen = () => {
   const { user } = useAuth();
@@ -48,20 +48,13 @@ const RecurringEntriesScreen = () => {
   };
 
   const handleDelete = (item) => {
-    Alert.alert(
+    showConfirm(
       'Delete Template',
       `Remove "${item.title}" from recurring list?\n\nThis will NOT affect any entries on your Home screen.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await deleteTemplate(item.id);
-            if (result.success) loadTemplates();
-          },
-        },
-      ]
+      async () => {
+        const result = await deleteTemplate(item.id);
+        if (result.success) loadTemplates();
+      }
     );
   };
 
@@ -87,11 +80,11 @@ const RecurringEntriesScreen = () => {
 
   const handleUpdate = async () => {
     if (!editTitle.trim()) {
-      Alert.alert('Error', 'Title is required.');
+      showAlert('Error', 'Title is required.');
       return;
     }
     if (!editAmount.trim() || parseFloat(editAmount) <= 0) {
-      Alert.alert('Error', 'Enter a valid amount.');
+      showAlert('Error', 'Enter a valid amount.');
       return;
     }
 
@@ -106,7 +99,7 @@ const RecurringEntriesScreen = () => {
       closeEdit();
       loadTemplates();
     } else {
-      Alert.alert('Error', result.message);
+      showAlert('Error', result.message);
     }
     setUpdating(false);
   };

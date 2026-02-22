@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Input } from '../../components/common';
@@ -15,6 +14,7 @@ import { FONTS } from '../../constants/fonts';
 import { registerUser } from '../../services/authService';
 import { validateRegisterForm } from '../../utils/validators';
 import { useAuth } from '../../hooks/useAuth';
+import { showAlert } from '../../utils/alertUtils';
 
 const RegisterScreen = ({ navigation }) => {
   const { markUserCreated } = useAuth();
@@ -55,10 +55,10 @@ const RegisterScreen = ({ navigation }) => {
         markUserCreated();
         navigation.replace('Login');
       } else {
-        Alert.alert('Error', result.message);
+        showAlert('Error', result.message);
       }
     } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      showAlert('Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }

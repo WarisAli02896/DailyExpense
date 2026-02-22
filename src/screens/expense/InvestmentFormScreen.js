@@ -6,7 +6,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
+  Switch,
   Image,
   Pressable,
 } from 'react-native';
@@ -16,10 +16,12 @@ import { Button, Input, Dropdown } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import { addEntry } from '../../services/entryService';
+import { addOrUpdateTemplate } from '../../services/recurringService';
 import { getPersons } from '../../services/personService';
 import { pickInvoice, saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName, formatTime12h } from '../../utils/dateUtils';
+import { showAlert } from '../../utils/alertUtils';
 
 const INVEST_COLOR = '#7C4DFF';
 
@@ -30,6 +32,7 @@ const InvestmentFormScreen = ({ navigation }) => {
   const [personOptions, setPersonOptions] = useState([]);
   const [amount, setAmount] = useState('');
   const [invoice, setInvoice] = useState(null);
+  const [isRecurring, setIsRecurring] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -65,7 +68,7 @@ const InvestmentFormScreen = ({ navigation }) => {
     if (result.success) {
       setInvoice(result.file);
     } else if (!result.canceled) {
-      Alert.alert('Error', result.message || 'Could not pick file.');
+      showAlert('Error', result.message || 'Could not pick file.');
     }
   };
 
@@ -96,26 +99,38 @@ const InvestmentFormScreen = ({ navigation }) => {
       }
 
       const personLabel = personOptions.find((p) => p.value === selectedPerson)?.label || '';
+      const entryTitle = `${investmentName.trim()} — ${personLabel}`;
 
       const result = await addEntry({
         userId: user.id,
         type: 'spending',
         entryType: 'investment',
-        title: `${investmentName.trim()} — ${personLabel}`,
+        title: entryTitle,
         amount: parseFloat(amount),
         date: formatDateForDB(new Date()),
         personId: parseInt(selectedPerson, 10),
+        isRecurring,
         invoiceUri,
         invoiceType,
       });
 
       if (result.success) {
+        if (isRecurring) {
+          await addOrUpdateTemplate({
+            userId: user.id,
+            type: 'spending',
+            entryType: 'investment',
+            title: entryTitle,
+            amount: parseFloat(amount),
+            companyName: personLabel,
+          });
+        }
         navigation.goBack();
       } else {
-        Alert.alert('Error', result.message);
+        showAlert('Error', result.message);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to add investment. Please try again.');
+      showAlert('Error', 'Failed to add investment. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -288,6 +303,34 @@ const InvestmentFormScreen = ({ navigation }) => {
               </View>
             )}
           </View>
+
+          {/* Recurring Toggle */}
+          <View style={styles.recurringCard}>
+            <View style={styles.recurringLeft}>
+              <View style={styles.recurringIcon}>
+                <Ionicons name="repeat" size={22} color={INVEST_COLOR} />
+              </View>
+              <View>
+                <Text style={styles.recurringTitle}>Monthly Recurring</Text>
+                <Text style={styles.recurringDesc}>Repeat this investment every month</Text>
+              </View>
+            </View>
+            <Switch
+              value={isRecurring}
+              onValueChange={setIsRecurring}
+              trackColor={{ false: COLORS.border, true: INVEST_COLOR + '80' }}
+              thumbColor={isRecurring ? INVEST_COLOR : COLORS.textLight}
+            />
+          </View>
+
+          {isRecurring && (
+            <View style={styles.recurringNote}>
+              <Ionicons name="information-circle-outline" size={16} color={INVEST_COLOR} />
+              <Text style={styles.recurringNoteText}>
+                This amount will be automatically added at the start of each month
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Submit */}
@@ -560,6 +603,56 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.xs,
     color: COLORS.textSecondary,
     marginTop: 2,
+  },
+  recurringCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  recurringLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  recurringIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: INVEST_COLOR + '14',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recurringTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  recurringDesc: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+    maxWidth: 180,
+  },
+  recurringNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: INVEST_COLOR + '10',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 12,
+    gap: 8,
+  },
+  recurringNoteText: {
+    fontSize: FONTS.sizes.sm,
+    color: INVEST_COLOR,
+    flex: 1,
   },
   submitBtn: {
     marginTop: 32,

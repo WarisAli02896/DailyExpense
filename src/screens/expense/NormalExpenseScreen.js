@@ -6,24 +6,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
-  Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Input } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import { addEntry } from '../../services/entryService';
-import { pickInvoice, saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
 
-const AddExpenseScreen = ({ navigation }) => {
+const ACCENT = '#E91E63';
+
+const NormalExpenseScreen = ({ navigation }) => {
   const { user } = useAuth();
-  const [expenseName, setExpenseName] = useState('');
+  const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [invoice, setInvoice] = useState(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -41,22 +39,9 @@ const AddExpenseScreen = ({ navigation }) => {
     if (errors.amount) setErrors((prev) => ({ ...prev, amount: null }));
   };
 
-  const handlePickInvoice = async () => {
-    const result = await pickInvoice();
-    if (result.success) {
-      setInvoice(result.file);
-    } else if (!result.canceled) {
-      showAlert('Error', result.message || 'Could not pick file.');
-    }
-  };
-
-  const handleRemoveInvoice = () => {
-    setInvoice(null);
-  };
-
   const validate = () => {
     const newErrors = {};
-    if (!expenseName.trim()) newErrors.expenseName = 'Expense name is required';
+    if (!title.trim()) newErrors.title = 'Title is required';
     if (!amount.trim()) newErrors.amount = 'Amount is required';
     else if (parseFloat(amount) <= 0) newErrors.amount = 'Amount must be greater than 0';
     setErrors(newErrors);
@@ -68,22 +53,13 @@ const AddExpenseScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      let invoiceUri = null;
-      let invoiceType = null;
-      if (invoice) {
-        invoiceUri = await saveInvoice(invoice.uri, invoice.name);
-        invoiceType = invoice.mimeType || null;
-      }
-
       const result = await addEntry({
         userId: user.id,
         type: 'spending',
-        entryType: 'expense',
-        title: expenseName.trim(),
+        entryType: 'normal_expense',
+        title: title.trim(),
         amount: parseFloat(amount),
         date: formatDateForDB(new Date()),
-        invoiceUri,
-        invoiceType,
       });
 
       if (result.success) {
@@ -98,8 +74,6 @@ const AddExpenseScreen = ({ navigation }) => {
     }
   };
 
-  const fileType = invoice ? getFileType(invoice.mimeType) : null;
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -110,19 +84,16 @@ const AddExpenseScreen = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Month Banner */}
         <View style={styles.monthBanner}>
           <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
           <Text style={styles.monthBannerText}>{currentMonthName} {currentYear}</Text>
         </View>
 
-        {/* Header Badge */}
         <View style={styles.badge}>
-          <Ionicons name="cart-outline" size={20} color={COLORS.expense} />
-          <Text style={styles.badgeText}>Daily Expense</Text>
+          <Ionicons name="wallet-outline" size={20} color={ACCENT} />
+          <Text style={styles.badgeText}>Normal Expense</Text>
         </View>
 
-        {/* Date/Time Info */}
         <View style={styles.dateTimeCard}>
           <View style={styles.dateTimeItem}>
             <Ionicons name="calendar" size={16} color={COLORS.primary} />
@@ -135,17 +106,16 @@ const AddExpenseScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Form */}
         <View style={styles.form}>
           <Input
-            label="Expense Detail"
-            value={expenseName}
+            label="What did you spend on?"
+            value={title}
             onChangeText={(text) => {
-              setExpenseName(text);
-              if (errors.expenseName) setErrors((prev) => ({ ...prev, expenseName: null }));
+              setTitle(text);
+              if (errors.title) setErrors((prev) => ({ ...prev, title: null }));
             }}
-            placeholder="e.g. Lunch, Taxi, Groceries..."
-            error={errors.expenseName}
+            placeholder="e.g. Tea, Snacks, Parking..."
+            error={errors.title}
           />
 
           <View style={styles.amountContainer}>
@@ -166,62 +136,13 @@ const AddExpenseScreen = ({ navigation }) => {
               </View>
             </View>
           </View>
-
-          {/* Picture Attachment (Optional) */}
-          <View style={styles.invoiceSection}>
-            <View style={styles.labelRow}>
-              <Text style={styles.inputLabel}>Receipt / Picture</Text>
-              <Text style={styles.optionalTag}>Optional</Text>
-            </View>
-            {!invoice ? (
-              <Pressable
-                style={({ pressed }) => [styles.invoicePickerBtn, pressed && styles.invoicePickerBtnPressed]}
-                onPress={handlePickInvoice}
-                role="button"
-              >
-                <View style={styles.invoicePickerContent}>
-                  <View style={styles.invoiceIconCircle}>
-                    <Ionicons name="camera-outline" size={28} color={COLORS.primary} />
-                  </View>
-                  <Text style={styles.invoicePickerTitle}>Attach a picture</Text>
-                  <Text style={styles.invoicePickerHint}>Photo, PDF, or document</Text>
-                </View>
-              </Pressable>
-            ) : (
-              <View style={styles.invoicePreview}>
-                <View style={styles.invoicePreviewLeft}>
-                  {fileType === 'image' ? (
-                    <Image source={{ uri: invoice.uri }} style={styles.invoiceThumbnail} />
-                  ) : (
-                    <View style={[styles.invoiceFileIcon, fileType === 'pdf' ? styles.pdfBg : styles.docBg]}>
-                      <Ionicons
-                        name={fileType === 'pdf' ? 'document-text' : 'document'}
-                        size={24}
-                        color={COLORS.textWhite}
-                      />
-                    </View>
-                  )}
-                  <View style={styles.invoiceInfo}>
-                    <Text style={styles.invoiceFileName} numberOfLines={1}>{invoice.name}</Text>
-                    <Text style={styles.invoiceFileSize}>
-                      {formatFileSize(invoice.size)} {fileType === 'pdf' ? '· PDF' : fileType === 'doc' ? '· DOC' : '· Image'}
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  style={({ pressed }) => [styles.removeInvoiceBtn, pressed && { opacity: 0.6 }]}
-                  onPress={handleRemoveInvoice}
-                  role="button"
-                  hitSlop={8}
-                >
-                  <Ionicons name="close-circle" size={24} color={COLORS.danger} />
-                </Pressable>
-              </View>
-            )}
-          </View>
         </View>
 
-        {/* Submit */}
+        <View style={styles.quickNote}>
+          <Ionicons name="flash" size={16} color={ACCENT} />
+          <Text style={styles.quickNoteText}>Quick entry — no receipt or extras needed</Text>
+        </View>
+
         <Button
           title="Add Expense"
           onPress={handleSubmit}
@@ -263,7 +184,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: COLORS.expense + '14',
+    backgroundColor: ACCENT + '14',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
@@ -273,7 +194,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: FONTS.sizes.md,
     fontWeight: FONTS.weights.semiBold,
-    color: COLORS.expense,
+    color: ACCENT,
   },
   dateTimeCard: {
     flexDirection: 'row',
@@ -312,17 +233,6 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: 6,
   },
-  labelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  optionalTag: {
-    fontSize: FONTS.sizes.xs,
-    color: COLORS.textLight,
-    fontStyle: 'italic',
-  },
   amountContainer: {
     marginBottom: 16,
   },
@@ -332,7 +242,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   currencyTag: {
-    backgroundColor: COLORS.expense,
+    backgroundColor: ACCENT,
     paddingHorizontal: 16,
     paddingVertical: 15,
     borderRadius: 12,
@@ -348,98 +258,25 @@ const styles = StyleSheet.create({
   amountInput: {
     marginBottom: 0,
   },
-  invoiceSection: {
-    marginBottom: 16,
-  },
-  invoicePickerBtn: {
-    borderWidth: 2,
-    borderColor: COLORS.primary + '30',
-    borderStyle: 'dashed',
-    borderRadius: 14,
-    padding: 24,
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-  },
-  invoicePickerBtnPressed: {
-    backgroundColor: COLORS.primary + '08',
-  },
-  invoicePickerContent: {
-    alignItems: 'center',
-    gap: 6,
-  },
-  invoiceIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: COLORS.primary + '12',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  invoicePickerTitle: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semiBold,
-    color: COLORS.text,
-  },
-  invoicePickerHint: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.textSecondary,
-  },
-  invoicePreview: {
+  quickNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: COLORS.borderLight,
-  },
-  invoicePreviewLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  invoiceThumbnail: {
-    width: 50,
-    height: 50,
+    gap: 8,
+    backgroundColor: ACCENT + '0C',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: COLORS.borderLight,
+    marginTop: 8,
   },
-  invoiceFileIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pdfBg: {
-    backgroundColor: '#E53935',
-  },
-  docBg: {
-    backgroundColor: '#1565C0',
-  },
-  invoiceInfo: {
-    flex: 1,
-  },
-  invoiceFileName: {
+  quickNoteText: {
     fontSize: FONTS.sizes.sm,
-    fontWeight: FONTS.weights.semiBold,
-    color: COLORS.text,
-    marginBottom: 2,
-  },
-  invoiceFileSize: {
-    fontSize: FONTS.sizes.xs,
     color: COLORS.textSecondary,
-  },
-  removeInvoiceBtn: {
-    padding: 4,
+    fontWeight: FONTS.weights.medium,
   },
   submitBtn: {
     marginTop: 32,
-    backgroundColor: COLORS.expense,
+    backgroundColor: ACCENT,
   },
 });
 
-export default AddExpenseScreen;
+export default NormalExpenseScreen;

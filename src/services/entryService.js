@@ -74,6 +74,45 @@ export const getMonthSummary = async (userId, month, year) => {
   }
 };
 
+export const updateEntry = async (entryId, fields) => {
+  try {
+    const db = await getDBConnection();
+    const setClauses = [];
+    const values = [];
+
+    if (fields.type !== undefined) { setClauses.push('type = ?'); values.push(fields.type); }
+    if (fields.entryType !== undefined) { setClauses.push('entry_type = ?'); values.push(fields.entryType); }
+    if (fields.title !== undefined) { setClauses.push('title = ?'); values.push(fields.title); }
+    if (fields.amount !== undefined) { setClauses.push('amount = ?'); values.push(fields.amount); }
+    if (fields.companyName !== undefined) { setClauses.push('company_name = ?'); values.push(fields.companyName || null); }
+    if (fields.notes !== undefined) { setClauses.push('notes = ?'); values.push(fields.notes || null); }
+    if (fields.isRecurring !== undefined) { setClauses.push('is_recurring = ?'); values.push(fields.isRecurring ? 1 : 0); }
+    if (fields.invoiceUri !== undefined) { setClauses.push('invoice_uri = ?'); values.push(fields.invoiceUri || null); }
+    if (fields.invoiceType !== undefined) { setClauses.push('invoice_type = ?'); values.push(fields.invoiceType || null); }
+
+    if (setClauses.length === 0) {
+      return { success: false, message: 'No fields to update.' };
+    }
+
+    values.push(entryId);
+    await db.runAsync(`UPDATE entries SET ${setClauses.join(', ')} WHERE id = ?`, values);
+
+    const updated = await db.getFirstAsync(
+      `SELECT e.*, c.name as category_name, c.icon as category_icon, c.color as category_color, p.name as person_name
+       FROM entries e
+       LEFT JOIN categories c ON e.category_id = c.id
+       LEFT JOIN persons p ON e.person_id = p.id
+       WHERE e.id = ?`,
+      [entryId]
+    );
+
+    return { success: true, message: 'Entry updated successfully!', data: updated };
+  } catch (error) {
+    console.error('Update Entry Error:', error);
+    return { success: false, message: 'Failed to update entry.' };
+  }
+};
+
 export const deleteEntry = async (entryId) => {
   try {
     const db = await getDBConnection();

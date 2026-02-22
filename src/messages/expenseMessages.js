@@ -6,9 +6,15 @@ export const EXPENSE_MESSAGES = {
 
   // Error
   ADD_FAILED: 'Failed to add expense. Please try again.',
-  UPDATE_FAILED: 'Failed to update expense. Please try again.',
+  UPDATE_FAILED: 'Failed to update entry. Please try again.',
   DELETE_FAILED: 'Failed to delete expense. Please try again.',
   FETCH_FAILED: 'Failed to load expenses. Please try again.',
+
+  // Entry Edit
+  ENTRY_UPDATE_SUCCESS: 'Entry updated successfully!',
+  ENTRY_UPDATE_FAILED: 'Failed to update entry.',
+  ENTRY_TITLE_REQUIRED: 'Title is required.',
+  ENTRY_AMOUNT_INVALID: 'Enter a valid amount greater than 0.',
 
   // Validation
   TITLE_REQUIRED: 'Expense title is required.',
@@ -23,6 +29,12 @@ export const EXPENSE_MESSAGES = {
   INVOICE_PICK_FAILED: 'Could not pick file. Please try again.',
   INVOICE_SAVE_FAILED: 'Failed to save invoice file.',
   INVOICE_OPEN_FAILED: 'Cannot open this file.',
+
+  // Recurring
+  RECURRING_APPLIED: 'Recurring entries applied for this month.',
+  RECURRING_ALREADY_APPLIED: 'All recurring entries already applied this month.',
+  RECURRING_NONE: 'No recurring templates found.',
+  RECURRING_FAILED: 'Failed to apply recurring entries.',
 
   // Info
   NO_EXPENSES: 'No expenses found. Start adding your expenses!',

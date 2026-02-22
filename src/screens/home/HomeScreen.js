@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +15,9 @@ import { FONTS } from '../../constants/fonts';
 import { getMonthName, getShortMonthName, formatTime12h } from '../../utils/dateUtils';
 import { formatAmount } from '../../utils/currencyUtils';
 import { getEntriesByMonth, getMonthSummary, deleteEntry } from '../../services/entryService';
+import { applyRecurringEntries } from '../../services/recurringService';
 import { useAuth } from '../../hooks/useAuth';
+import { showAlert, showConfirm } from '../../utils/alertUtils';
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -53,26 +54,24 @@ const HomeScreen = ({ navigation }) => {
   );
 
   const onRefresh = useCallback(async () => {
+    if (!user) return;
     setRefreshing(true);
+    const result = await applyRecurringEntries(user.id, currentMonth, currentYear);
     await loadData();
     setRefreshing(false);
-  }, [loadData]);
+    if (result.success && result.added > 0) {
+      showAlert('Recurring Entries', result.message);
+    }
+  }, [user, currentMonth, currentYear, loadData]);
 
   const handleDelete = (entry) => {
-    Alert.alert(
+    showConfirm(
       'Delete Entry',
       `Are you sure you want to delete "${entry.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await deleteEntry(entry.id);
-            if (result.success) loadData();
-          },
-        },
-      ]
+      async () => {
+        const result = await deleteEntry(entry.id);
+        if (result.success) loadData();
+      }
     );
   };
 
@@ -165,7 +164,17 @@ const HomeScreen = ({ navigation }) => {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Entries</Text>
-        <Text style={styles.entryCount}>{entries.length} entries</Text>
+        <View style={styles.sectionRight}>
+          <Text style={styles.entryCount}>{entries.length} entries</Text>
+          <Pressable
+            style={({ pressed }) => [styles.refreshButton, pressed && { opacity: 0.6 }]}
+            onPress={onRefresh}
+            role="button"
+            aria-label="Refresh and apply recurring entries"
+          >
+            <Ionicons name="refresh" size={18} color={COLORS.primary} />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -337,9 +346,22 @@ const styles = StyleSheet.create({
     fontWeight: FONTS.weights.bold,
     color: COLORS.text,
   },
+  sectionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   entryCount: {
     fontSize: FONTS.sizes.sm,
     color: COLORS.textSecondary,
+  },
+  refreshButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.primary + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyContainer: {
     alignItems: 'center',

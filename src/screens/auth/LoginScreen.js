@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button, Input } from '../../components/common';
@@ -15,6 +14,7 @@ import { FONTS } from '../../constants/fonts';
 import { loginUser } from '../../services/authService';
 import { validateLoginForm } from '../../utils/validators';
 import { useAuth } from '../../hooks/useAuth';
+import { showAlert } from '../../utils/alertUtils';
 
 const LoginScreen = ({ navigation }) => {
   const { login } = useAuth();
@@ -54,10 +54,10 @@ const LoginScreen = ({ navigation }) => {
       if (result.success) {
         login(result.data);
       } else {
-        Alert.alert('Error', result.message);
+        showAlert('Error', result.message);
       }
     } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      showAlert('Error', 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }

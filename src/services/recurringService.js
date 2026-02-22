@@ -1,4 +1,5 @@
 import { getDBConnection } from './database';
+import { formatDateForDB } from '../utils/dateUtils';
 
 export const addOrUpdateTemplate = async ({ userId, type, entryType, title, amount, companyName }) => {
   try {
@@ -58,6 +59,56 @@ export const updateTemplate = async (templateId, fields) => {
   } catch (error) {
     console.error('Update Template Error:', error);
     return { success: false, message: 'Failed to update template.' };
+  }
+};
+
+export const applyRecurringEntries = async (userId, month, year) => {
+  try {
+    const db = await getDBConnection();
+    const mm = String(month).padStart(2, '0');
+    const yyyy = String(year);
+
+    const templates = await db.getAllAsync(
+      'SELECT * FROM recurring_templates WHERE user_id = ?',
+      [userId]
+    );
+
+    if (!templates.length) {
+      return { success: true, added: 0, message: 'No recurring templates found.' };
+    }
+
+    let added = 0;
+
+    for (const tpl of templates) {
+      const existing = await db.getFirstAsync(
+        `SELECT id FROM entries
+         WHERE user_id = ? AND is_recurring = 1
+           AND type = ? AND entry_type = ?
+           AND LOWER(title) = LOWER(?)
+           AND LOWER(COALESCE(company_name, '')) = LOWER(?)
+           AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
+         LIMIT 1`,
+        [userId, tpl.type, tpl.entry_type, tpl.title, tpl.company_name || '', mm, yyyy]
+      );
+
+      if (existing) continue;
+
+      const dateStr = formatDateForDB(new Date(year, month - 1, 1));
+      await db.runAsync(
+        `INSERT INTO entries (user_id, type, entry_type, title, amount, company_name, date, is_recurring)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
+        [userId, tpl.type, tpl.entry_type, tpl.title, tpl.amount, tpl.company_name || null, dateStr]
+      );
+      added++;
+    }
+
+    if (added === 0) {
+      return { success: true, added: 0, message: 'All recurring entries already applied this month.' };
+    }
+    return { success: true, added, message: `${added} recurring ${added === 1 ? 'entry' : 'entries'} added.` };
+  } catch (error) {
+    console.error('Apply Recurring Error:', error);
+    return { success: false, added: 0, message: 'Failed to apply recurring entries.' };
   }
 };
 

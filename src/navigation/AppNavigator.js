@@ -4,6 +4,7 @@ import BottomTabNavigator from './BottomTabNavigator';
 import AddEntryScreen from '../screens/expense/AddEntryScreen';
 import SalaryFormScreen from '../screens/expense/SalaryFormScreen';
 import AddExpenseScreen from '../screens/expense/AddExpenseScreen';
+import NormalExpenseScreen from '../screens/expense/NormalExpenseScreen';
 import InvestmentFormScreen from '../screens/expense/InvestmentFormScreen';
 import EntryDetailScreen from '../screens/expense/EntryDetailScreen';
 import RecurringEntriesScreen from '../screens/expense/RecurringEntriesScreen';
@@ -38,6 +39,11 @@ const AppNavigator = () => {
         name="SalaryForm"
         component={SalaryFormScreen}
         options={{ title: 'Add Salary' }}
+      />
+      <Stack.Screen
+        name="NormalExpense"
+        component={NormalExpenseScreen}
+        options={{ title: 'Normal Expense' }}
       />
       <Stack.Screen
         name="AddExpense"

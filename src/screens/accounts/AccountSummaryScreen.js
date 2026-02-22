@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   Pressable,
-  Alert,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +15,7 @@ import { getPersonEntries } from '../../services/personService';
 import { deleteEntry } from '../../services/entryService';
 import { formatAmount } from '../../utils/currencyUtils';
 import { getMonthName, formatTime12h } from '../../utils/dateUtils';
+import { showAlert, showConfirm } from '../../utils/alertUtils';
 
 const INVEST_COLOR = '#7C4DFF';
 
@@ -44,21 +44,14 @@ const AccountSummaryScreen = ({ route, navigation }) => {
   const totalInvested = entries.reduce((sum, e) => sum + (e.amount || 0), 0);
 
   const handleDelete = (entry) => {
-    Alert.alert(
+    showConfirm(
       'Delete Entry',
       `Remove this investment of Rs. ${formatAmount(entry.amount)}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await deleteEntry(entry.id);
-            if (result.success) loadEntries();
-            else Alert.alert('Error', 'Failed to delete entry.');
-          },
-        },
-      ]
+      async () => {
+        const result = await deleteEntry(entry.id);
+        if (result.success) loadEntries();
+        else showAlert('Error', 'Failed to delete entry.');
+      }
     );
   };
 

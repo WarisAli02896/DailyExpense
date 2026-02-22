@@ -7,7 +7,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
   Image,
   Pressable,
 } from 'react-native';
@@ -20,6 +19,7 @@ import { addOrUpdateTemplate } from '../../services/recurringService';
 import { pickInvoice, saveInvoice, formatFileSize, isImageFile, getFileType } from '../../services/fileService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName } from '../../utils/dateUtils';
+import { showAlert } from '../../utils/alertUtils';
 
 const SalaryFormScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -47,7 +47,7 @@ const SalaryFormScreen = ({ navigation }) => {
     if (result.success) {
       setInvoice(result.file);
     } else if (!result.canceled) {
-      Alert.alert('Error', result.message || 'Could not pick file.');
+      showAlert('Error', result.message || 'Could not pick file.');
     }
   };
 
@@ -102,10 +102,10 @@ const SalaryFormScreen = ({ navigation }) => {
         }
         navigation.goBack();
       } else {
-        Alert.alert('Error', result.message);
+        showAlert('Error', result.message);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to add entry. Please try again.');
+      showAlert('Error', 'Failed to add entry. Please try again.');
     } finally {
       setLoading(false);
     }
