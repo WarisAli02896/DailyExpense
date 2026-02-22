@@ -11,12 +11,12 @@ import {
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Input } from '../../components/common';
+import { Button, Input, AttachmentPicker } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import { addEntry } from '../../services/entryService';
 import { addOrUpdateTemplate } from '../../services/recurringService';
-import { pickInvoice, saveInvoice, formatFileSize, isImageFile, getFileType } from '../../services/fileService';
+import { saveInvoice, formatFileSize, isImageFile, getFileType } from '../../services/fileService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
@@ -29,6 +29,7 @@ const SalaryFormScreen = ({ navigation }) => {
   const [invoice, setInvoice] = useState(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const now = new Date();
   const currentMonthName = getMonthName(now.getMonth() + 1);
@@ -40,15 +41,6 @@ const SalaryFormScreen = ({ navigation }) => {
     const sanitized = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : filtered;
     setAmount(sanitized);
     if (errors.amount) setErrors((prev) => ({ ...prev, amount: null }));
-  };
-
-  const handlePickInvoice = async () => {
-    const result = await pickInvoice();
-    if (result.success) {
-      setInvoice(result.file);
-    } else if (!result.canceled) {
-      showAlert('Error', result.message || 'Could not pick file.');
-    }
   };
 
   const handleRemoveInvoice = () => {
@@ -173,15 +165,15 @@ const SalaryFormScreen = ({ navigation }) => {
             {!invoice ? (
               <Pressable
                 style={({ pressed }) => [styles.invoicePickerBtn, pressed && styles.invoicePickerBtnPressed]}
-                onPress={handlePickInvoice}
+                onPress={() => setPickerVisible(true)}
                 role="button"
               >
                 <View style={styles.invoicePickerContent}>
                   <View style={styles.invoiceIconCircle}>
-                    <Ionicons name="cloud-upload-outline" size={28} color={COLORS.primary} />
+                    <Ionicons name="camera-outline" size={28} color={COLORS.primary} />
                   </View>
                   <Text style={styles.invoicePickerTitle}>Tap to attach</Text>
-                  <Text style={styles.invoicePickerHint}>Image, PDF, or Word document</Text>
+                  <Text style={styles.invoicePickerHint}>Camera, gallery, or document</Text>
                 </View>
               </Pressable>
             ) : (
@@ -254,6 +246,13 @@ const SalaryFormScreen = ({ navigation }) => {
           style={styles.submitBtn}
         />
       </ScrollView>
+
+      <AttachmentPicker
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onFilePicked={(file) => setInvoice(file)}
+        accentColor={COLORS.primary}
+      />
     </KeyboardAvoidingView>
   );
 };

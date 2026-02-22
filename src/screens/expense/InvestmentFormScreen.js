@@ -12,13 +12,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { Button, Input, Dropdown } from '../../components/common';
+import { Button, Input, Dropdown, AttachmentPicker } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import { addEntry } from '../../services/entryService';
 import { addOrUpdateTemplate } from '../../services/recurringService';
 import { getPersons } from '../../services/personService';
-import { pickInvoice, saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
+import { saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
@@ -33,8 +33,10 @@ const InvestmentFormScreen = ({ navigation }) => {
   const [amount, setAmount] = useState('');
   const [invoice, setInvoice] = useState(null);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [showInAccount, setShowInAccount] = useState(true);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,15 +63,6 @@ const InvestmentFormScreen = ({ navigation }) => {
     const sanitized = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : filtered;
     setAmount(sanitized);
     if (errors.amount) setErrors((prev) => ({ ...prev, amount: null }));
-  };
-
-  const handlePickInvoice = async () => {
-    const result = await pickInvoice();
-    if (result.success) {
-      setInvoice(result.file);
-    } else if (!result.canceled) {
-      showAlert('Error', result.message || 'Could not pick file.');
-    }
   };
 
   const handleRemoveInvoice = () => {
@@ -110,6 +103,7 @@ const InvestmentFormScreen = ({ navigation }) => {
         date: formatDateForDB(new Date()),
         personId: parseInt(selectedPerson, 10),
         isRecurring,
+        showInAccount,
         invoiceUri,
         invoiceType,
       });
@@ -123,6 +117,7 @@ const InvestmentFormScreen = ({ navigation }) => {
             title: entryTitle,
             amount: parseFloat(amount),
             companyName: personLabel,
+            personId: parseInt(selectedPerson, 10),
           });
         }
         navigation.goBack();
@@ -260,7 +255,7 @@ const InvestmentFormScreen = ({ navigation }) => {
             {!invoice ? (
               <Pressable
                 style={({ pressed }) => [styles.invoicePickerBtn, pressed && styles.invoicePickerBtnPressed]}
-                onPress={handlePickInvoice}
+                onPress={() => setPickerVisible(true)}
                 role="button"
               >
                 <View style={styles.invoicePickerContent}>
@@ -268,7 +263,7 @@ const InvestmentFormScreen = ({ navigation }) => {
                     <Ionicons name="camera-outline" size={28} color={INVEST_COLOR} />
                   </View>
                   <Text style={styles.invoicePickerTitle}>Attach a picture</Text>
-                  <Text style={styles.invoicePickerHint}>Screenshot, receipt, or document</Text>
+                  <Text style={styles.invoicePickerHint}>Camera, gallery, or document</Text>
                 </View>
               </Pressable>
             ) : (
@@ -302,6 +297,28 @@ const InvestmentFormScreen = ({ navigation }) => {
                 </Pressable>
               </View>
             )}
+          </View>
+
+          {/* Show in Account Toggle */}
+          <View style={[styles.accountToggleCard, !selectedPerson && styles.accountToggleDisabled]}>
+            <View style={styles.accountToggleLeft}>
+              <View style={[styles.accountToggleIcon, !selectedPerson && { opacity: 0.4 }]}>
+                <Ionicons name="eye-outline" size={20} color={selectedPerson ? INVEST_COLOR : COLORS.textLight} />
+              </View>
+              <View>
+                <Text style={[styles.accountToggleTitle, !selectedPerson && { color: COLORS.textLight }]}>Show in Account</Text>
+                <Text style={[styles.accountToggleDesc, !selectedPerson && { color: COLORS.textLight }]}>
+                  {selectedPerson ? 'Visible in account profile' : 'Select an account first'}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={selectedPerson ? showInAccount : false}
+              onValueChange={setShowInAccount}
+              disabled={!selectedPerson}
+              trackColor={{ false: COLORS.border, true: INVEST_COLOR + '80' }}
+              thumbColor={selectedPerson && showInAccount ? INVEST_COLOR : COLORS.textLight}
+            />
           </View>
 
           {/* Recurring Toggle */}
@@ -341,6 +358,13 @@ const InvestmentFormScreen = ({ navigation }) => {
           style={styles.submitBtn}
         />
       </ScrollView>
+
+      <AttachmentPicker
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onFilePicked={(file) => setInvoice(file)}
+        accentColor={INVEST_COLOR}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -603,6 +627,44 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.xs,
     color: COLORS.textSecondary,
     marginTop: 2,
+  },
+  accountToggleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  accountToggleDisabled: {
+    opacity: 0.6,
+  },
+  accountToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  accountToggleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: INVEST_COLOR + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  accountToggleTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.text,
+    marginBottom: 1,
+  },
+  accountToggleDesc: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
   },
   recurringCard: {
     flexDirection: 'row',

@@ -4,8 +4,8 @@ import BottomTabNavigator from './BottomTabNavigator';
 import AddEntryScreen from '../screens/expense/AddEntryScreen';
 import SalaryFormScreen from '../screens/expense/SalaryFormScreen';
 import AddExpenseScreen from '../screens/expense/AddExpenseScreen';
-import NormalExpenseScreen from '../screens/expense/NormalExpenseScreen';
 import InvestmentFormScreen from '../screens/expense/InvestmentFormScreen';
+import BillFormScreen from '../screens/expense/BillFormScreen';
 import EntryDetailScreen from '../screens/expense/EntryDetailScreen';
 import RecurringEntriesScreen from '../screens/expense/RecurringEntriesScreen';
 import AccountsScreen from '../screens/accounts/AccountsScreen';
@@ -41,11 +41,6 @@ const AppNavigator = () => {
         options={{ title: 'Add Salary' }}
       />
       <Stack.Screen
-        name="NormalExpense"
-        component={NormalExpenseScreen}
-        options={{ title: 'Normal Expense' }}
-      />
-      <Stack.Screen
         name="AddExpense"
         component={AddExpenseScreen}
         options={{ title: 'Add Expense' }}
@@ -54,6 +49,11 @@ const AppNavigator = () => {
         name="InvestmentForm"
         component={InvestmentFormScreen}
         options={{ title: 'Add Investment' }}
+      />
+      <Stack.Screen
+        name="BillForm"
+        component={BillFormScreen}
+        options={{ title: 'Add Bill' }}
       />
       <Stack.Screen
         name="EntryDetail"

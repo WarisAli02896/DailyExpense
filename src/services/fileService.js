@@ -1,5 +1,6 @@
 import * as FileSystem from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { Platform } from 'react-native';
 
 const INVOICES_DIR = `${FileSystem.documentDirectory}invoices/`;
@@ -38,6 +39,71 @@ export const pickInvoice = async () => {
   } catch (error) {
     console.error('Pick Invoice Error:', error);
     return { success: false, message: 'Failed to pick file.' };
+  }
+};
+
+export const takePhoto = async () => {
+  try {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      return { success: false, message: 'Camera permission is required to take photos.' };
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: false,
+    });
+
+    if (result.canceled) return { success: false, canceled: true };
+
+    const asset = result.assets[0];
+    const fileName = `photo_${Date.now()}.jpg`;
+    return {
+      success: true,
+      file: {
+        uri: asset.uri,
+        name: fileName,
+        size: asset.fileSize || 0,
+        mimeType: asset.mimeType || 'image/jpeg',
+      },
+    };
+  } catch (error) {
+    console.error('Take Photo Error:', error);
+    return { success: false, message: 'Failed to take photo.' };
+  }
+};
+
+export const pickFromGallery = async () => {
+  try {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      return { success: false, message: 'Gallery permission is required.' };
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+      allowsEditing: false,
+    });
+
+    if (result.canceled) return { success: false, canceled: true };
+
+    const asset = result.assets[0];
+    const ext = asset.uri.split('.').pop() || 'jpg';
+    const fileName = `gallery_${Date.now()}.${ext}`;
+    return {
+      success: true,
+      file: {
+        uri: asset.uri,
+        name: fileName,
+        size: asset.fileSize || 0,
+        mimeType: asset.mimeType || 'image/jpeg',
+      },
+    };
+  } catch (error) {
+    console.error('Pick From Gallery Error:', error);
+    return { success: false, message: 'Failed to pick image.' };
   }
 };
 

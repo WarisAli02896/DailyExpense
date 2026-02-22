@@ -4,9 +4,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/home/HomeScreen';
-import AccountsScreen from '../screens/accounts/AccountsScreen';
+import EarningListScreen from '../screens/earning/EarningListScreen';
 import ExpenseListScreen from '../screens/expense/ExpenseListScreen';
-import ReportsScreen from '../screens/reports/ReportsScreen';
+import AccountsScreen from '../screens/accounts/AccountsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import { COLORS } from '../constants/colors';
 
@@ -15,9 +15,9 @@ const Tab = createBottomTabNavigator();
 const getTabIcon = (routeName, focused) => {
   const icons = {
     Home: focused ? 'home' : 'home-outline',
-    Accounts: focused ? 'people' : 'people-outline',
+    Earnings: focused ? 'trending-up' : 'trending-up-outline',
     Expenses: focused ? 'wallet' : 'wallet-outline',
-    Reports: focused ? 'bar-chart' : 'bar-chart-outline',
+    Accounts: focused ? 'people' : 'people-outline',
     Settings: focused ? 'settings' : 'settings-outline',
   };
   return icons[routeName] || 'help-circle-outline';
@@ -54,9 +54,9 @@ const BottomTabNavigator = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Accounts" component={AccountsScreen} />
+      <Tab.Screen name="Earnings" component={EarningListScreen} />
       <Tab.Screen name="Expenses" component={ExpenseListScreen} />
-      <Tab.Screen name="Reports" component={ReportsScreen} />
+      <Tab.Screen name="Accounts" component={AccountsScreen} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>
   );

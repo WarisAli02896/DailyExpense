@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 
+const capitalize = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+
 const EntryRow = ({ title, amount, type, category, date, invoiceUri, onPress, onDelete }) => {
   const isEarning = type === 'earning';
 
@@ -27,7 +29,7 @@ const EntryRow = ({ title, amount, type, category, date, invoiceUri, onPress, on
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
         <View style={styles.metaRow}>
           <Text style={styles.meta}>
-            {category}{date ? ` · ${date}` : ''}
+            {capitalize(category)}{date ? ` · ${date}` : ''}
           </Text>
           {invoiceUri ? (
             <View style={styles.invoiceTag}>

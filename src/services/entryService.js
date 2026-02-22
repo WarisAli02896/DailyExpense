@@ -1,15 +1,16 @@
 import { getDBConnection } from './database';
 import { formatDateForDB } from '../utils/dateUtils';
 
-export const addEntry = async ({ userId, type, entryType, title, amount, companyName, categoryId, date, notes, isRecurring, invoiceUri, invoiceType, personId }) => {
+export const addEntry = async ({ userId, type, entryType, title, amount, companyName, categoryId, date, notes, isRecurring, invoiceUri, invoiceType, invoiceUri2, invoiceType2, personId, showInAccount }) => {
   try {
     const db = await getDBConnection();
     const dateStr = date || formatDateForDB(new Date());
+    const showFlag = showInAccount === undefined ? 1 : (showInAccount ? 1 : 0);
 
     const result = await db.runAsync(
-      `INSERT INTO entries (user_id, type, entry_type, title, amount, company_name, category_id, date, notes, is_recurring, invoice_uri, invoice_type, person_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, type, entryType, title, amount, companyName || null, categoryId || null, dateStr, notes || null, isRecurring ? 1 : 0, invoiceUri || null, invoiceType || null, personId || null]
+      `INSERT INTO entries (user_id, type, entry_type, title, amount, company_name, category_id, date, notes, is_recurring, invoice_uri, invoice_type, invoice_uri_2, invoice_type_2, person_id, show_in_account)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, type, entryType, title, amount, companyName || null, categoryId || null, dateStr, notes || null, isRecurring ? 1 : 0, invoiceUri || null, invoiceType || null, invoiceUri2 || null, invoiceType2 || null, personId || null, showFlag]
     );
 
     return { success: true, message: 'Entry added successfully!', data: { id: result.lastInsertRowId } };
@@ -39,6 +40,30 @@ export const getEntriesByMonth = async (userId, month, year) => {
   } catch (error) {
     console.error('Get Entries Error:', error);
     return { success: false, data: [] };
+  }
+};
+
+export const getEntriesByType = async (userId, type, month, year) => {
+  try {
+    const db = await getDBConnection();
+    const mm = String(month).padStart(2, '0');
+    const yyyy = String(year);
+
+    const entries = await db.getAllAsync(
+      `SELECT e.*, c.name as category_name, c.icon as category_icon, c.color as category_color, p.name as person_name
+       FROM entries e
+       LEFT JOIN categories c ON e.category_id = c.id
+       LEFT JOIN persons p ON e.person_id = p.id
+       WHERE e.user_id = ? AND e.type = ? AND strftime('%m', e.date) = ? AND strftime('%Y', e.date) = ?
+       ORDER BY e.date DESC, e.created_at DESC`,
+      [userId, type, mm, yyyy]
+    );
+
+    const total = entries.reduce((sum, e) => sum + e.amount, 0);
+    return { success: true, data: entries, total };
+  } catch (error) {
+    console.error('Get Entries By Type Error:', error);
+    return { success: false, data: [], total: 0 };
   }
 };
 
@@ -89,6 +114,9 @@ export const updateEntry = async (entryId, fields) => {
     if (fields.isRecurring !== undefined) { setClauses.push('is_recurring = ?'); values.push(fields.isRecurring ? 1 : 0); }
     if (fields.invoiceUri !== undefined) { setClauses.push('invoice_uri = ?'); values.push(fields.invoiceUri || null); }
     if (fields.invoiceType !== undefined) { setClauses.push('invoice_type = ?'); values.push(fields.invoiceType || null); }
+    if (fields.invoiceUri2 !== undefined) { setClauses.push('invoice_uri_2 = ?'); values.push(fields.invoiceUri2 || null); }
+    if (fields.invoiceType2 !== undefined) { setClauses.push('invoice_type_2 = ?'); values.push(fields.invoiceType2 || null); }
+    if (fields.showInAccount !== undefined) { setClauses.push('show_in_account = ?'); values.push(fields.showInAccount ? 1 : 0); }
 
     if (setClauses.length === 0) {
       return { success: false, message: 'No fields to update.' };

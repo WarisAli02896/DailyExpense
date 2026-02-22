@@ -20,7 +20,7 @@ export const getPersons = async (userId) => {
     const persons = await db.getAllAsync(
       `SELECT p.*, COALESCE(SUM(e.amount), 0) as total_invested, COUNT(e.id) as entry_count
        FROM persons p
-       LEFT JOIN entries e ON e.person_id = p.id AND e.entry_type = 'investment'
+       LEFT JOIN entries e ON e.person_id = p.id AND e.show_in_account = 1
        WHERE p.user_id = ?
        GROUP BY p.id
        ORDER BY p.name ASC`,
@@ -37,7 +37,7 @@ export const getPersonEntries = async (personId) => {
   try {
     const db = await getDBConnection();
     const entries = await db.getAllAsync(
-      `SELECT * FROM entries WHERE person_id = ? ORDER BY date DESC, created_at DESC`,
+      `SELECT * FROM entries WHERE person_id = ? AND show_in_account = 1 ORDER BY date DESC, created_at DESC`,
       [personId]
     );
     return { success: true, data: entries };

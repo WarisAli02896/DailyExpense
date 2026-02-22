@@ -22,30 +22,42 @@ import { showAlert, showConfirm } from '../../utils/alertUtils';
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState({ totalEarnings: 0, totalSpendings: 0, amountLeft: 0 });
   const [refreshing, setRefreshing] = useState(false);
 
-  const now = currentTime;
-  const currentMonth = now.getMonth() + 1;
-  const currentYear = now.getFullYear();
+  const isCurrentMonth = year === new Date().getFullYear() && month === new Date().getMonth() + 1;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  const goPrevMonth = () => {
+    if (month === 1) { setMonth(12); setYear(year - 1); }
+    else setMonth(month - 1);
+  };
+
+  const goNextMonth = () => {
+    if (isCurrentMonth) return;
+    if (month === 12) { setMonth(1); setYear(year + 1); }
+    else setMonth(month + 1);
+  };
+
   const loadData = useCallback(async () => {
     if (!user) return;
 
     const [entriesResult, summaryResult] = await Promise.all([
-      getEntriesByMonth(user.id, currentMonth, currentYear),
-      getMonthSummary(user.id, currentMonth, currentYear),
+      getEntriesByMonth(user.id, month, year),
+      getMonthSummary(user.id, month, year),
     ]);
 
     if (entriesResult.success) setEntries(entriesResult.data);
     if (summaryResult.success) setSummary(summaryResult.data);
-  }, [user, currentMonth, currentYear]);
+  }, [user, month, year]);
 
   useFocusEffect(
     useCallback(() => {
@@ -56,13 +68,13 @@ const HomeScreen = ({ navigation }) => {
   const onRefresh = useCallback(async () => {
     if (!user) return;
     setRefreshing(true);
-    const result = await applyRecurringEntries(user.id, currentMonth, currentYear);
+    const result = await applyRecurringEntries(user.id, month, year);
     await loadData();
     setRefreshing(false);
     if (result.success && result.added > 0) {
       showAlert('Recurring Entries', result.message);
     }
-  }, [user, currentMonth, currentYear, loadData]);
+  }, [user, month, year, loadData]);
 
   const handleDelete = (entry) => {
     showConfirm(
@@ -75,10 +87,10 @@ const HomeScreen = ({ navigation }) => {
     );
   };
 
-  const monthName = getMonthName(currentMonth);
-  const hours = now.getHours();
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const monthName = getMonthName(month);
+  const hours = currentTime.getHours();
+  const minutes = String(currentTime.getMinutes()).padStart(2, '0');
+  const seconds = String(currentTime.getSeconds()).padStart(2, '0');
   const ampm = hours >= 12 ? 'PM' : 'AM';
   const displayHours = String(hours % 12 || 12).padStart(2, '0');
   const timeString = `${displayHours}:${minutes}:${seconds}`;
@@ -106,9 +118,22 @@ const HomeScreen = ({ navigation }) => {
   const ListHeader = () => (
     <View>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.monthText}>{monthName} {currentYear}</Text>
-          <Text style={styles.greeting}>Your monthly overview</Text>
+        <View style={styles.monthNav}>
+          <Pressable onPress={goPrevMonth} style={styles.monthNavBtn} hitSlop={10}>
+            <Ionicons name="chevron-back" size={20} color={COLORS.text} />
+          </Pressable>
+          <View style={styles.monthCenter}>
+            <Text style={styles.monthText}>{monthName} {year}</Text>
+            <Text style={styles.greeting}>Your monthly overview</Text>
+          </View>
+          <Pressable
+            onPress={goNextMonth}
+            style={[styles.monthNavBtn, isCurrentMonth && { opacity: 0.3 }]}
+            disabled={isCurrentMonth}
+            hitSlop={10}
+          >
+            <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
+          </Pressable>
         </View>
         <View style={styles.clockContainer}>
           <Ionicons name="time-outline" size={16} color={COLORS.primaryLight} />
@@ -165,7 +190,7 @@ const HomeScreen = ({ navigation }) => {
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Recent Entries</Text>
         <View style={styles.sectionRight}>
-          <Text style={styles.entryCount}>{entries.length} entries</Text>
+          <Text style={styles.entryCount}>{entries.length} Entries</Text>
           <Pressable
             style={({ pressed }) => [styles.refreshButton, pressed && { opacity: 0.6 }]}
             onPress={onRefresh}
@@ -231,15 +256,33 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingTop: 50,
   },
+  monthNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  monthNavBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  monthCenter: {},
   monthText: {
     fontSize: FONTS.sizes.xxl,
     fontWeight: FONTS.weights.bold,
     color: COLORS.text,
+    textAlign: 'center',
   },
   greeting: {
     fontSize: FONTS.sizes.md,
     color: COLORS.textSecondary,
     marginTop: 2,
+    textAlign: 'center',
   },
   clockContainer: {
     flexDirection: 'row',

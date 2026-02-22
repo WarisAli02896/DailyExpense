@@ -31,9 +31,17 @@ export const EARNING_TYPES = [
   { value: 'advance', label: 'Advance', icon: 'arrow-forward-circle-outline' },
 ];
 
+export const BILL_TYPES = [
+  { value: 'electricity', label: 'Electricity', icon: 'flash-outline' },
+  { value: 'gas', label: 'Gas', icon: 'flame-outline' },
+  { value: 'water_supply', label: 'Water Supply', icon: 'water-outline' },
+  { value: 'drinking_water', label: 'Drinking Water', icon: 'cafe-outline' },
+  { value: 'credit_card', label: 'Credit Card', icon: 'card-outline' },
+  { value: 'medicines', label: 'Medicines', icon: 'medkit-outline' },
+];
+
 export const ENTRY_TYPES = [
   { id: 'salary', label: 'Salary', icon: 'cash-outline', color: '#4CAF50', type: 'earning' },
-  { id: 'normal_expense', label: 'Normal Expense', icon: 'wallet-outline', color: '#E91E63', type: 'spending' },
   { id: 'expense', label: 'Expense', icon: 'cart-outline', color: '#F44336', type: 'spending' },
   { id: 'investment', label: 'Investment', icon: 'trending-up-outline', color: '#7C4DFF', type: 'spending' },
   { id: 'freelance', label: 'Freelance', icon: 'laptop-outline', color: '#2196F3', type: 'earning' },

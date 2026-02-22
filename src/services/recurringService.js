@@ -1,13 +1,13 @@
 import { getDBConnection } from './database';
 import { formatDateForDB } from '../utils/dateUtils';
 
-export const addOrUpdateTemplate = async ({ userId, type, entryType, title, amount, companyName }) => {
+export const addOrUpdateTemplate = async ({ userId, type, entryType, title, amount, companyName, personId }) => {
   try {
     const db = await getDBConnection();
 
     const existing = await db.getFirstAsync(
-      `SELECT id FROM recurring_templates WHERE user_id = ? AND type = ? AND entry_type = ? AND LOWER(company_name) = LOWER(?)`,
-      [userId, type, entryType, companyName || '']
+      `SELECT id FROM recurring_templates WHERE user_id = ? AND type = ? AND entry_type = ? AND LOWER(COALESCE(company_name, '')) = LOWER(?) AND COALESCE(person_id, 0) = ?`,
+      [userId, type, entryType, companyName || '', personId || 0]
     );
 
     if (existing) {
@@ -19,8 +19,8 @@ export const addOrUpdateTemplate = async ({ userId, type, entryType, title, amou
     }
 
     const result = await db.runAsync(
-      'INSERT INTO recurring_templates (user_id, type, entry_type, title, amount, company_name) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, type, entryType, title, amount, companyName || null]
+      'INSERT INTO recurring_templates (user_id, type, entry_type, title, amount, company_name, person_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [userId, type, entryType, title, amount, companyName || null, personId || null]
     );
     return { success: true, message: 'Template added.', data: { id: result.lastInsertRowId } };
   } catch (error) {
@@ -52,6 +52,7 @@ export const updateTemplate = async (templateId, fields) => {
     if (fields.title !== undefined) { setClauses.push('title = ?'); values.push(fields.title); }
     if (fields.amount !== undefined) { setClauses.push('amount = ?'); values.push(fields.amount); }
     if (fields.companyName !== undefined) { setClauses.push('company_name = ?'); values.push(fields.companyName); }
+    if (fields.personId !== undefined) { setClauses.push('person_id = ?'); values.push(fields.personId || null); }
 
     values.push(templateId);
     await db.runAsync(`UPDATE recurring_templates SET ${setClauses.join(', ')} WHERE id = ?`, values);
@@ -82,22 +83,22 @@ export const applyRecurringEntries = async (userId, month, year) => {
     for (const tpl of templates) {
       const existing = await db.getFirstAsync(
         `SELECT id FROM entries
-         WHERE user_id = ? AND is_recurring = 1
+         WHERE user_id = ?
            AND type = ? AND entry_type = ?
            AND LOWER(title) = LOWER(?)
-           AND LOWER(COALESCE(company_name, '')) = LOWER(?)
+           AND COALESCE(person_id, 0) = ?
            AND strftime('%m', date) = ? AND strftime('%Y', date) = ?
          LIMIT 1`,
-        [userId, tpl.type, tpl.entry_type, tpl.title, tpl.company_name || '', mm, yyyy]
+        [userId, tpl.type, tpl.entry_type, tpl.title, tpl.person_id || 0, mm, yyyy]
       );
 
       if (existing) continue;
 
       const dateStr = formatDateForDB(new Date(year, month - 1, 1));
       await db.runAsync(
-        `INSERT INTO entries (user_id, type, entry_type, title, amount, company_name, date, is_recurring)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 1)`,
-        [userId, tpl.type, tpl.entry_type, tpl.title, tpl.amount, tpl.company_name || null, dateStr]
+        `INSERT INTO entries (user_id, type, entry_type, title, amount, company_name, person_id, date, is_recurring)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        [userId, tpl.type, tpl.entry_type, tpl.title, tpl.amount, tpl.company_name || null, tpl.person_id || null, dateStr]
       );
       added++;
     }

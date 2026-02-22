@@ -18,8 +18,8 @@ import { ENTRY_TYPES } from '../../constants/categories';
 import { formatAmount } from '../../utils/currencyUtils';
 import { getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { deleteEntry, updateEntry } from '../../services/entryService';
-import { pickInvoice, saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
-import { Button, Dropdown } from '../../components/common';
+import { saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
+import { Button, Dropdown, AttachmentPicker } from '../../components/common';
 import { showAlert, showConfirm } from '../../utils/alertUtils';
 
 const TYPE_OPTIONS = [
@@ -47,8 +47,10 @@ const EntryDetailScreen = ({ route, navigation }) => {
   const [editCompany, setEditCompany] = useState(entry.company_name || '');
   const [editNotes, setEditNotes] = useState(entry.notes || '');
   const [editRecurring, setEditRecurring] = useState(!!entry.is_recurring);
+  const [editShowInAccount, setEditShowInAccount] = useState(entry.show_in_account !== 0);
   const [editInvoice, setEditInvoice] = useState(null);
   const [invoiceRemoved, setInvoiceRemoved] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const isEarning = entry.type === 'earning';
   const editIsEarning = editType === 'earning';
@@ -128,6 +130,7 @@ const EntryDetailScreen = ({ route, navigation }) => {
     setEditCompany(entry.company_name || '');
     setEditNotes(entry.notes || '');
     setEditRecurring(!!entry.is_recurring);
+    setEditShowInAccount(entry.show_in_account !== 0);
     setEditInvoice(null);
     setInvoiceRemoved(false);
     setEditing(true);
@@ -145,14 +148,9 @@ const EntryDetailScreen = ({ route, navigation }) => {
     setEditAmount(parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : filtered);
   };
 
-  const handlePickNewInvoice = async () => {
-    const result = await pickInvoice();
-    if (result.success) {
-      setEditInvoice(result.file);
-      setInvoiceRemoved(false);
-    } else if (!result.canceled) {
-      showAlert('Error', result.message || 'Could not pick file.');
-    }
+  const handleFilePicked = (file) => {
+    setEditInvoice(file);
+    setInvoiceRemoved(false);
   };
 
   const handleRemoveInvoice = () => {
@@ -174,6 +172,7 @@ const EntryDetailScreen = ({ route, navigation }) => {
         companyName: editCompany.trim() || null,
         notes: editNotes.trim() || null,
         isRecurring: editRecurring,
+        showInAccount: editShowInAccount,
       };
 
       if (editInvoice) {
@@ -331,6 +330,28 @@ const EntryDetailScreen = ({ route, navigation }) => {
               />
             </View>
 
+            {/* Show in Account Toggle */}
+            <View style={[styles.recurringRow, !entry.person_id && { opacity: 0.5 }]}>
+              <View style={styles.recurringLeft}>
+                <View style={styles.recurringIconWrap}>
+                  <Ionicons name="eye-outline" size={18} color={entry.person_id ? accentColor : COLORS.textLight} />
+                </View>
+                <View>
+                  <Text style={styles.recurringLabel}>Show in Account</Text>
+                  <Text style={styles.recurringHint}>
+                    {entry.person_id ? 'Visible in account profile' : 'No account linked'}
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={entry.person_id ? editShowInAccount : false}
+                onValueChange={setEditShowInAccount}
+                disabled={!entry.person_id}
+                trackColor={{ false: COLORS.border, true: accentColor + '80' }}
+                thumbColor={entry.person_id && editShowInAccount ? accentColor : COLORS.textLight}
+              />
+            </View>
+
             {/* Notes */}
             <EditField label="Notes" value={editNotes} onChangeText={setEditNotes} placeholder="Add notes (optional)" multiline />
           </View>
@@ -343,6 +364,9 @@ const EntryDetailScreen = ({ route, navigation }) => {
             <DetailRow icon="calendar-outline" label="Date" value={dateDisplay} />
             {timeDisplay ? <DetailRow icon="time-outline" label="Time" value={timeDisplay} /> : null}
             <DetailRow icon="repeat-outline" label="Recurring" value={entry.is_recurring ? 'Yes — Monthly' : 'No'} />
+            {entry.person_id ? (
+              <DetailRow icon="eye-outline" label="Show in Account" value={entry.show_in_account !== 0 ? 'Yes' : 'No'} />
+            ) : null}
             {entry.notes ? <DetailRow icon="chatbox-ellipses-outline" label="Notes" value={entry.notes} /> : null}
           </>
         )}
@@ -406,10 +430,10 @@ const EntryDetailScreen = ({ route, navigation }) => {
           <View style={styles.invoiceEditActions}>
             <Pressable
               style={({ pressed }) => [styles.invoicePickBtn, pressed && { opacity: 0.8 }]}
-              onPress={handlePickNewInvoice}
+              onPress={() => setPickerVisible(true)}
               role="button"
             >
-              <Ionicons name="cloud-upload-outline" size={20} color={COLORS.primary} />
+              <Ionicons name="camera-outline" size={20} color={COLORS.primary} />
               <Text style={styles.invoicePickBtnText}>
                 {(hasInvoice && !invoiceRemoved) || editInvoice ? 'Replace File' : 'Attach File'}
               </Text>
@@ -474,6 +498,13 @@ const EntryDetailScreen = ({ route, navigation }) => {
           textStyle={styles.deleteBtnText}
         />
       )}
+
+      <AttachmentPicker
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onFilePicked={handleFilePicked}
+        accentColor={accentColor}
+      />
     </ScrollView>
   );
 };

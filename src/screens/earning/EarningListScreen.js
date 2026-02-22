@@ -18,7 +18,7 @@ import { getEntriesByType, deleteEntry } from '../../services/entryService';
 import { useAuth } from '../../hooks/useAuth';
 import { showConfirm } from '../../utils/alertUtils';
 
-const ExpenseListScreen = ({ navigation }) => {
+const EarningListScreen = ({ navigation }) => {
   const { user } = useAuth();
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -29,7 +29,7 @@ const ExpenseListScreen = ({ navigation }) => {
 
   const loadData = useCallback(async () => {
     if (!user) return;
-    const result = await getEntriesByType(user.id, 'spending', month, year);
+    const result = await getEntriesByType(user.id, 'earning', month, year);
     if (result.success) {
       setEntries(result.data);
       setTotal(result.total);
@@ -108,10 +108,10 @@ const ExpenseListScreen = ({ navigation }) => {
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryIcon}>
-          <Ionicons name="arrow-up-circle" size={28} color={COLORS.expense} />
+          <Ionicons name="arrow-down-circle" size={28} color={COLORS.income} />
         </View>
         <View>
-          <Text style={styles.summaryLabel}>Total Spendings</Text>
+          <Text style={styles.summaryLabel}>Total Earnings</Text>
           <Text style={styles.summaryAmount}>Rs. {formatAmount(total)}</Text>
         </View>
         <Text style={styles.summaryCount}>{entries.length} Entries</Text>
@@ -121,9 +121,9 @@ const ExpenseListScreen = ({ navigation }) => {
 
   const ListEmpty = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="wallet-outline" size={60} color={COLORS.textLight} />
-      <Text style={styles.emptyTitle}>No expenses this month</Text>
-      <Text style={styles.emptyText}>Add an expense or investment to see it here</Text>
+      <Ionicons name="cash-outline" size={60} color={COLORS.textLight} />
+      <Text style={styles.emptyTitle}>No earnings this month</Text>
+      <Text style={styles.emptyText}>Add a salary or freelance entry to see it here</Text>
     </View>
   );
 
@@ -138,7 +138,7 @@ const ExpenseListScreen = ({ navigation }) => {
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.expense]} tintColor={COLORS.expense} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.income]} tintColor={COLORS.income} />
         }
       />
     </View>
@@ -179,19 +179,19 @@ const styles = StyleSheet.create({
   summaryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.expense + '12',
+    backgroundColor: COLORS.income + '12',
     borderRadius: 16,
     padding: 18,
     marginBottom: 20,
     gap: 14,
     borderWidth: 1,
-    borderColor: COLORS.expense + '25',
+    borderColor: COLORS.income + '25',
   },
   summaryIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.expense + '1A',
+    backgroundColor: COLORS.income + '1A',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   summaryAmount: {
     fontSize: FONTS.sizes.xl,
     fontWeight: FONTS.weights.bold,
-    color: COLORS.expense,
+    color: COLORS.income,
   },
   summaryCount: {
     marginLeft: 'auto',
@@ -233,4 +233,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ExpenseListScreen;
+export default EarningListScreen;

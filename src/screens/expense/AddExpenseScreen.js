@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,17 @@ import {
   ScrollView,
   Image,
   Pressable,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Input } from '../../components/common';
+import { useFocusEffect } from '@react-navigation/native';
+import { Button, Input, Dropdown, AttachmentPicker } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import { addEntry } from '../../services/entryService';
-import { pickInvoice, saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
+import { addOrUpdateTemplate } from '../../services/recurringService';
+import { getPersons } from '../../services/personService';
+import { saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
@@ -23,9 +27,27 @@ const AddExpenseScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [expenseName, setExpenseName] = useState('');
   const [amount, setAmount] = useState('');
+  const [selectedPerson, setSelectedPerson] = useState('');
+  const [personOptions, setPersonOptions] = useState([]);
   const [invoice, setInvoice] = useState(null);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [showInAccount, setShowInAccount] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [pickerVisible, setPickerVisible] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      const loadPersons = async () => {
+        if (!user) return;
+        const result = await getPersons(user.id);
+        if (result.success) {
+          setPersonOptions(result.data.map((p) => ({ value: String(p.id), label: p.name })));
+        }
+      };
+      loadPersons();
+    }, [user])
+  );
 
   const now = new Date();
   const currentMonthName = getMonthName(now.getMonth() + 1);
@@ -39,15 +61,6 @@ const AddExpenseScreen = ({ navigation }) => {
     const sanitized = parts.length > 2 ? parts[0] + '.' + parts.slice(1).join('') : filtered;
     setAmount(sanitized);
     if (errors.amount) setErrors((prev) => ({ ...prev, amount: null }));
-  };
-
-  const handlePickInvoice = async () => {
-    const result = await pickInvoice();
-    if (result.success) {
-      setInvoice(result.file);
-    } else if (!result.canceled) {
-      showAlert('Error', result.message || 'Could not pick file.');
-    }
   };
 
   const handleRemoveInvoice = () => {
@@ -75,6 +88,9 @@ const AddExpenseScreen = ({ navigation }) => {
         invoiceType = invoice.mimeType || null;
       }
 
+      const personId = selectedPerson ? parseInt(selectedPerson, 10) : null;
+      const personLabel = personOptions.find((p) => p.value === selectedPerson)?.label || '';
+
       const result = await addEntry({
         userId: user.id,
         type: 'spending',
@@ -82,11 +98,25 @@ const AddExpenseScreen = ({ navigation }) => {
         title: expenseName.trim(),
         amount: parseFloat(amount),
         date: formatDateForDB(new Date()),
+        personId,
+        isRecurring,
+        showInAccount: personId ? showInAccount : true,
         invoiceUri,
         invoiceType,
       });
 
       if (result.success) {
+        if (isRecurring) {
+          await addOrUpdateTemplate({
+            userId: user.id,
+            type: 'spending',
+            entryType: 'expense',
+            title: expenseName.trim(),
+            amount: parseFloat(amount),
+            companyName: personLabel || undefined,
+            personId,
+          });
+        }
         navigation.goBack();
       } else {
         showAlert('Error', result.message);
@@ -167,6 +197,55 @@ const AddExpenseScreen = ({ navigation }) => {
             </View>
           </View>
 
+          {/* Account (Optional) */}
+          <View style={styles.accountSection}>
+            <View style={styles.labelRow}>
+              <Text style={styles.inputLabel}>Account (Person)</Text>
+              <Text style={styles.optionalTag}>Optional</Text>
+            </View>
+            <Dropdown
+              value={selectedPerson}
+              options={personOptions}
+              onSelect={(val) => {
+                setSelectedPerson(val);
+                if (val && !showInAccount) setShowInAccount(true);
+              }}
+              placeholder={personOptions.length > 0 ? 'Select an account (optional)' : 'No accounts available'}
+            />
+            {selectedPerson ? (
+              <Pressable
+                style={styles.clearAccount}
+                onPress={() => { setSelectedPerson(''); setShowInAccount(false); }}
+                hitSlop={8}
+              >
+                <Ionicons name="close-circle" size={16} color={COLORS.textLight} />
+                <Text style={styles.clearAccountText}>Clear account</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {/* Show in Account Toggle */}
+          <View style={[styles.accountToggleCard, !selectedPerson && styles.accountToggleDisabled]}>
+            <View style={styles.accountToggleLeft}>
+              <View style={[styles.accountToggleIcon, !selectedPerson && { opacity: 0.4 }]}>
+                <Ionicons name="eye-outline" size={20} color={selectedPerson ? COLORS.primary : COLORS.textLight} />
+              </View>
+              <View>
+                <Text style={[styles.accountToggleTitle, !selectedPerson && { color: COLORS.textLight }]}>Show in Account</Text>
+                <Text style={[styles.accountToggleDesc, !selectedPerson && { color: COLORS.textLight }]}>
+                  {selectedPerson ? 'Visible in account profile' : 'Select an account first'}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={selectedPerson ? showInAccount : false}
+              onValueChange={setShowInAccount}
+              disabled={!selectedPerson}
+              trackColor={{ false: COLORS.border, true: COLORS.primary + '80' }}
+              thumbColor={selectedPerson && showInAccount ? COLORS.primary : COLORS.textLight}
+            />
+          </View>
+
           {/* Picture Attachment (Optional) */}
           <View style={styles.invoiceSection}>
             <View style={styles.labelRow}>
@@ -176,7 +255,7 @@ const AddExpenseScreen = ({ navigation }) => {
             {!invoice ? (
               <Pressable
                 style={({ pressed }) => [styles.invoicePickerBtn, pressed && styles.invoicePickerBtnPressed]}
-                onPress={handlePickInvoice}
+                onPress={() => setPickerVisible(true)}
                 role="button"
               >
                 <View style={styles.invoicePickerContent}>
@@ -184,7 +263,7 @@ const AddExpenseScreen = ({ navigation }) => {
                     <Ionicons name="camera-outline" size={28} color={COLORS.primary} />
                   </View>
                   <Text style={styles.invoicePickerTitle}>Attach a picture</Text>
-                  <Text style={styles.invoicePickerHint}>Photo, PDF, or document</Text>
+                  <Text style={styles.invoicePickerHint}>Camera, gallery, or document</Text>
                 </View>
               </Pressable>
             ) : (
@@ -221,6 +300,34 @@ const AddExpenseScreen = ({ navigation }) => {
           </View>
         </View>
 
+        {/* Recurring Toggle */}
+        <View style={styles.recurringCard}>
+          <View style={styles.recurringLeft}>
+            <View style={styles.recurringIcon}>
+              <Ionicons name="repeat" size={22} color={COLORS.expense} />
+            </View>
+            <View>
+              <Text style={styles.recurringTitle}>Monthly Recurring</Text>
+              <Text style={styles.recurringDesc}>Repeat this expense every month</Text>
+            </View>
+          </View>
+          <Switch
+            value={isRecurring}
+            onValueChange={setIsRecurring}
+            trackColor={{ false: COLORS.border, true: COLORS.expense + '80' }}
+            thumbColor={isRecurring ? COLORS.expense : COLORS.textLight}
+          />
+        </View>
+
+        {isRecurring && (
+          <View style={styles.recurringNote}>
+            <Ionicons name="information-circle-outline" size={16} color={COLORS.expense} />
+            <Text style={styles.recurringNoteText}>
+              This amount will be automatically added at the start of each month
+            </Text>
+          </View>
+        )}
+
         {/* Submit */}
         <Button
           title="Add Expense"
@@ -229,6 +336,13 @@ const AddExpenseScreen = ({ navigation }) => {
           style={styles.submitBtn}
         />
       </ScrollView>
+
+      <AttachmentPicker
+        visible={pickerVisible}
+        onClose={() => setPickerVisible(false)}
+        onFilePicked={(file) => setInvoice(file)}
+        accentColor={COLORS.expense}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -348,6 +462,58 @@ const styles = StyleSheet.create({
   amountInput: {
     marginBottom: 0,
   },
+  accountSection: {
+    marginBottom: 16,
+  },
+  clearAccount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    alignSelf: 'flex-end',
+  },
+  clearAccountText: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textLight,
+  },
+  accountToggleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  accountToggleDisabled: {
+    opacity: 0.6,
+  },
+  accountToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  accountToggleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  accountToggleTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.text,
+    marginBottom: 1,
+  },
+  accountToggleDesc: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+  },
   invoiceSection: {
     marginBottom: 16,
   },
@@ -435,6 +601,56 @@ const styles = StyleSheet.create({
   },
   removeInvoiceBtn: {
     padding: 4,
+  },
+  recurringCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  recurringLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  recurringIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.expense + '14',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recurringTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.text,
+    marginBottom: 2,
+  },
+  recurringDesc: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+    maxWidth: 180,
+  },
+  recurringNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.expense + '10',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  recurringNoteText: {
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.expense,
+    flex: 1,
   },
   submitBtn: {
     marginTop: 32,
