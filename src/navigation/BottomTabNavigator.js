@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, Pressable } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,9 @@ import BillListScreen from '../screens/bills/BillListScreen';
 import AccountsScreen from '../screens/accounts/AccountsScreen';
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import { COLORS } from '../constants/colors';
+import { useAuth } from '../hooks/useAuth';
+import { logoutUser } from '../services/authService';
+import { showAlert, showConfirm } from '../utils/alertUtils';
 
 const Tab = createBottomTabNavigator();
 
@@ -28,6 +31,22 @@ const getTabIcon = (routeName, focused) => {
 const BottomTabNavigator = () => {
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 8);
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    showConfirm('Logout', 'Are you sure you want to logout?', async () => {
+      try {
+        const result = await logoutUser();
+        if (result.success) {
+          logout();
+        } else {
+          showAlert('Error', result.message);
+        }
+      } catch (error) {
+        showAlert('Error', 'Logout failed. Please try again.');
+      }
+    });
+  };
 
   return (
     <Tab.Navigator
@@ -52,7 +71,20 @@ const BottomTabNavigator = () => {
           fontSize: 11,
           fontWeight: '500',
         },
-        headerShown: false,
+        headerStyle: { backgroundColor: COLORS.primary },
+        headerTintColor: COLORS.textWhite,
+        headerTitleStyle: { fontWeight: '600' },
+        headerTitleAlign: 'center',
+        headerRight: () => (
+          <Pressable
+            onPress={handleLogout}
+            style={({ pressed }) => [{ marginRight: 12, opacity: pressed ? 0.7 : 1 }]}
+            role="button"
+            aria-label="Logout"
+          >
+            <Ionicons name="log-out-outline" size={22} color={COLORS.textWhite} />
+          </Pressable>
+        ),
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />

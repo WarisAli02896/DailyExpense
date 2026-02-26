@@ -16,6 +16,7 @@ import { FONTS } from '../../constants/fonts';
 import { BILL_TYPES } from '../../constants/categories';
 import { addEntry } from '../../services/entryService';
 import { saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
+import { getActivePerson } from '../../services/personService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
@@ -74,6 +75,14 @@ const BillFormScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
+      const activePersonResult = await getActivePerson(user.id);
+      const activePerson = activePersonResult.success ? activePersonResult.data : null;
+      if (!activePerson) {
+        showAlert('Account Required', 'Please set an active account first from Accounts tab.');
+        setLoading(false);
+        return;
+      }
+
       let invoiceUri = null;
       let invoiceType = null;
       if (billPicture) {
@@ -98,6 +107,8 @@ const BillFormScreen = ({ navigation }) => {
         amount: parseFloat(amount),
         notes: notes.trim() || null,
         date: formatDateForDB(new Date()),
+        personId: activePerson.id,
+        showInAccount: true,
         invoiceUri,
         invoiceType,
         invoiceUri2,

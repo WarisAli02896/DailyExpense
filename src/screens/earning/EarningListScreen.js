@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 20,
-    paddingTop: 50,
+    paddingTop: 8,
     paddingBottom: 40,
   },
   monthNav: {

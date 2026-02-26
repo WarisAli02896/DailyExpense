@@ -21,6 +21,8 @@ export const EXPENSE_MESSAGES = {
   AMOUNT_REQUIRED: 'Amount is required.',
   AMOUNT_INVALID: 'Please enter a valid amount.',
   AMOUNT_POSITIVE: 'Amount must be greater than 0.',
+  ACCOUNT_REQUIRED: 'Please select an account.',
+  ACCOUNT_MISSING: 'No accounts found. Please add an account first.',
   CATEGORY_REQUIRED: 'Please select a category.',
   DATE_REQUIRED: 'Date is required.',
   DATE_INVALID: 'Please enter a valid date.',

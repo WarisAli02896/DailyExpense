@@ -92,7 +92,7 @@ const RegisterScreen = ({ navigation }) => {
             placeholder="Enter your name"
             error={errors.username}
             maxLength={16}
-            autoCapitalize="none"
+            autoCapitalize="words"
           />
 
           <View style={styles.charCount}>

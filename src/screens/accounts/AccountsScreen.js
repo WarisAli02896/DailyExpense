@@ -12,7 +12,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import { useAuth } from '../../hooks/useAuth';
-import { addPerson, getPersons, deletePerson } from '../../services/personService';
+import { addPerson, getPersons, deletePerson, setPersonLock, setActivePerson } from '../../services/personService';
 import { formatAmount } from '../../utils/currencyUtils';
 import { showAlert, showConfirm } from '../../utils/alertUtils';
 
@@ -22,6 +22,7 @@ const AccountsScreen = () => {
   const navigation = useNavigation();
   const { user } = useAuth();
   const [persons, setPersons] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
   const [showInput, setShowInput] = useState(false);
@@ -38,7 +39,15 @@ const AccountsScreen = () => {
     }, [loadPersons])
   );
 
-  const grandTotal = persons.reduce((sum, p) => sum + (p.total_invested || 0), 0);
+  const selectedTotal = persons
+    .filter((p) => selectedIds.includes(p.id))
+    .reduce((sum, p) => sum + (p.total_invested || 0), 0);
+
+  const toggleSelection = (personId) => {
+    setSelectedIds((prev) => (
+      prev.includes(personId) ? prev.filter((id) => id !== personId) : [...prev, personId]
+    ));
+  };
 
   const handleAdd = async () => {
     if (!newName.trim()) {
@@ -70,6 +79,41 @@ const AccountsScreen = () => {
     );
   };
 
+  const handleToggleLock = async (e, person) => {
+    e.stopPropagation();
+    const nextLocked = person.is_locked !== 1;
+    const result = await setPersonLock(person.id, nextLocked);
+    if (result.success) {
+      loadPersons();
+    } else {
+      showAlert('Error', result.message);
+    }
+  };
+
+  const handleSetActive = async (e, person) => {
+    e.stopPropagation();
+    if (person.is_active === 1) return;
+
+    const result = await setActivePerson(user.id, person.id);
+    if (result.success) {
+      loadPersons();
+    } else {
+      showAlert('Error', result.message);
+    }
+  };
+
+  const handlePersonPress = (person) => {
+    if (selectedIds.length > 0) {
+      toggleSelection(person.id);
+      return;
+    }
+    navigation.navigate('AccountSummary', { person });
+  };
+
+  const handlePersonLongPress = (person) => {
+    toggleSelection(person.id);
+  };
+
   const getInitial = (name) => name.charAt(0).toUpperCase();
 
   const AVATAR_COLORS = ['#6C63FF', '#FF6584', '#4ECDC4', '#45B7D1', '#FF9800', '#7C4DFF', '#4CAF50', '#E53935'];
@@ -78,18 +122,40 @@ const AccountsScreen = () => {
     const bgColor = AVATAR_COLORS[index % AVATAR_COLORS.length];
     const totalInvested = item.total_invested || 0;
     const entryCount = item.entry_count || 0;
+    const isDefault = item.is_default === 1;
+    const isLocked = item.is_locked === 1;
+    const isActive = item.is_active === 1;
+    const isSelected = selectedIds.includes(item.id);
 
     return (
       <Pressable
-        style={({ pressed }) => [styles.personRow, pressed && styles.personRowPressed]}
-        onPress={() => navigation.navigate('AccountSummary', { person: item })}
+        style={({ pressed }) => [
+          styles.personRow,
+          isSelected && styles.personRowSelected,
+          pressed && styles.personRowPressed,
+        ]}
+        onPress={() => handlePersonPress(item)}
+        onLongPress={() => handlePersonLongPress(item)}
+        delayLongPress={250}
         role="button"
       >
         <View style={[styles.avatar, { backgroundColor: bgColor }]}>
           <Text style={styles.avatarText}>{getInitial(item.name)}</Text>
         </View>
         <View style={styles.personInfo}>
-          <Text style={styles.personName}>{item.name}</Text>
+          <View style={styles.personNameRow}>
+            <Text style={styles.personName}>{item.name}</Text>
+            {isDefault ? (
+              <View style={styles.defaultBadge}>
+                <Text style={styles.defaultBadgeText}>Default</Text>
+              </View>
+            ) : null}
+            {isActive ? (
+              <View style={styles.activeBadge}>
+                <Text style={styles.activeBadgeText}>Active</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.personMeta}>
             {entryCount} {entryCount === 1 ? 'investment' : 'investments'}
           </Text>
@@ -100,14 +166,54 @@ const AccountsScreen = () => {
             <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
           </View>
         </View>
-        <Pressable
-          style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
-          onPress={(e) => handleDelete(e, item)}
-          role="button"
-          hitSlop={8}
-        >
-          <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
-        </Pressable>
+        <View style={styles.rowActions}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.activeBtn,
+              isActive && styles.activeBtnSelected,
+              pressed && !isActive && styles.activeBtnPressed,
+            ]}
+            onPress={(e) => handleSetActive(e, item)}
+            role="button"
+            hitSlop={8}
+          >
+            <Ionicons
+              name={isActive ? 'checkmark-circle' : 'ellipse-outline'}
+              size={19}
+              color={isActive ? COLORS.primary : COLORS.textSecondary}
+            />
+          </Pressable>
+          {isDefault ? (
+            <View style={styles.lockBtn}>
+              <Ionicons name="lock-closed-outline" size={16} color={COLORS.textLight} />
+            </View>
+          ) : (
+            <>
+              <Pressable
+                style={({ pressed }) => [styles.lockToggleBtn, pressed && styles.lockTogglePressed]}
+                onPress={(e) => handleToggleLock(e, item)}
+                role="button"
+                hitSlop={8}
+              >
+                <Ionicons
+                  name={isLocked ? 'lock-closed-outline' : 'lock-open-outline'}
+                  size={17}
+                  color={isLocked ? COLORS.primary : COLORS.textSecondary}
+                />
+              </Pressable>
+              {!isLocked ? (
+                <Pressable
+                  style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
+                  onPress={(e) => handleDelete(e, item)}
+                  role="button"
+                  hitSlop={8}
+                >
+                  <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
+                </Pressable>
+              ) : null}
+            </>
+          )}
+        </View>
       </Pressable>
     );
   };
@@ -118,26 +224,32 @@ const AccountsScreen = () => {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Accounts</Text>
-          <Text style={styles.subtitle}>People you invest with</Text>
+          <Text style={styles.subtitle}>
+            {selectedIds.length > 0 ? `${selectedIds.length} selected` : 'Long press to select accounts'}
+          </Text>
         </View>
         <View style={styles.countBadge}>
           <Text style={styles.countText}>{persons.length}</Text>
         </View>
       </View>
 
-      {/* Grand Total Card */}
-      {persons.length > 0 && (
+      {/* Selected Total Card */}
+      {selectedIds.length > 0 && (
         <View style={styles.totalCard}>
           <View style={styles.totalCardLeft}>
             <Ionicons name="wallet-outline" size={22} color={INVEST_COLOR} />
             <View>
-              <Text style={styles.totalLabel}>Total Invested</Text>
-              <Text style={styles.totalAmount}>Rs. {formatAmount(grandTotal)}</Text>
+              <Text style={styles.totalLabel}>Selected Accounts Total</Text>
+              <Text style={styles.totalAmount}>Rs. {formatAmount(selectedTotal)}</Text>
             </View>
           </View>
-          <View style={styles.totalPersonCount}>
-            <Text style={styles.totalPersonCountText}>{persons.length} accounts</Text>
-          </View>
+          <Pressable
+            onPress={() => setSelectedIds([])}
+            style={({ pressed }) => [styles.clearSelectionBtn, pressed && { opacity: 0.7 }]}
+            role="button"
+          >
+            <Text style={styles.clearSelectionText}>Clear</Text>
+          </Pressable>
         </View>
       )}
 
@@ -207,7 +319,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     padding: 20,
-    paddingTop: 50,
+    paddingTop: 8,
   },
   header: {
     flexDirection: 'row',
@@ -271,6 +383,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   totalPersonCountText: {
+    fontSize: FONTS.sizes.xs,
+    fontWeight: FONTS.weights.semiBold,
+    color: INVEST_COLOR,
+  },
+  clearSelectionBtn: {
+    backgroundColor: INVEST_COLOR + '18',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  clearSelectionText: {
     fontSize: FONTS.sizes.xs,
     fontWeight: FONTS.weights.semiBold,
     color: INVEST_COLOR,
@@ -356,6 +479,11 @@ const styles = StyleSheet.create({
   personRowPressed: {
     backgroundColor: COLORS.borderLight,
   },
+  personRowSelected: {
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '10',
+  },
   avatar: {
     width: 44,
     height: 44,
@@ -372,10 +500,37 @@ const styles = StyleSheet.create({
   personInfo: {
     flex: 1,
   },
+  personNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   personName: {
     fontSize: FONTS.sizes.base,
     fontWeight: FONTS.weights.semiBold,
     color: COLORS.text,
+  },
+  defaultBadge: {
+    backgroundColor: COLORS.primary + '14',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  defaultBadgeText: {
+    fontSize: FONTS.sizes.xs,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.primary,
+  },
+  activeBadge: {
+    backgroundColor: COLORS.income + '18',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  activeBadgeText: {
+    fontSize: FONTS.sizes.xs,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.income,
   },
   personMeta: {
     fontSize: FONTS.sizes.xs,
@@ -394,7 +549,33 @@ const styles = StyleSheet.create({
   personRowRight: {
     marginTop: 2,
   },
+  rowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  activeBtn: {
+    padding: 8,
+    borderRadius: 10,
+  },
+  activeBtnSelected: {
+    backgroundColor: COLORS.primary + '12',
+  },
+  activeBtnPressed: {
+    backgroundColor: COLORS.borderLight,
+  },
+  lockToggleBtn: {
+    padding: 8,
+    borderRadius: 10,
+  },
+  lockTogglePressed: {
+    backgroundColor: COLORS.primary + '12',
+  },
   deleteBtn: {
+    padding: 8,
+    borderRadius: 10,
+  },
+  lockBtn: {
     padding: 8,
     borderRadius: 10,
   },

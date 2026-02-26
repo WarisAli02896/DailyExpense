@@ -1,70 +1,46 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  Switch,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Switch,
   Image,
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
 import { Button, Input, AttachmentPicker } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import { addEntry } from '../../services/entryService';
 import { addOrUpdateTemplate } from '../../services/recurringService';
-import { getPersons, getActivePerson } from '../../services/personService';
 import { saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
+import { getActivePerson } from '../../services/personService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
+import { EARNING_MESSAGES } from '../../messages/earningMessages';
 
-const INVEST_COLOR = '#7C4DFF';
-
-const InvestmentFormScreen = ({ navigation }) => {
+const EarningFormScreen = ({ navigation }) => {
   const { user } = useAuth();
-  const [investmentName, setInvestmentName] = useState('');
-  const [selectedPerson, setSelectedPerson] = useState('');
-  const [activePersonName, setActivePersonName] = useState('');
-  const [hasAccounts, setHasAccounts] = useState(false);
+  const [isSalary, setIsSalary] = useState(false);
+  const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [invoice, setInvoice] = useState(null);
+  const [notes, setNotes] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
+  const [invoice, setInvoice] = useState(null);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
-
-  useFocusEffect(
-    useCallback(() => {
-      const loadPersons = async () => {
-        if (!user) return;
-        const [personsResult, activeResult] = await Promise.all([
-          getPersons(user.id),
-          getActivePerson(user.id),
-        ]);
-
-        if (personsResult.success) {
-          setHasAccounts(personsResult.data.length > 0);
-        }
-
-        if (activeResult.success && activeResult.data) {
-          setSelectedPerson(String(activeResult.data.id));
-          setActivePersonName(activeResult.data.name);
-        }
-      };
-      loadPersons();
-    }, [user])
-  );
 
   const now = new Date();
   const currentMonthName = getMonthName(now.getMonth() + 1);
   const currentYear = now.getFullYear();
   const dateStr = `${String(now.getDate()).padStart(2, '0')} ${currentMonthName} ${currentYear}`;
   const timeStr = formatTime12h(now.toISOString());
+  const savedEntryType = isSalary ? 'salary' : 'earning';
 
   const handleAmountChange = (text) => {
     const filtered = text.replace(/[^0-9.]/g, '');
@@ -80,19 +56,28 @@ const InvestmentFormScreen = ({ navigation }) => {
 
   const validate = () => {
     const newErrors = {};
-    if (!selectedPerson) newErrors.person = hasAccounts ? 'Please set an active account' : 'No accounts found. Please add an account first.';
-    if (!investmentName.trim()) newErrors.investmentName = 'Investment name is required';
-    if (!amount.trim()) newErrors.amount = 'Amount is required';
-    else if (parseFloat(amount) <= 0) newErrors.amount = 'Amount must be greater than 0';
+    if (!title.trim()) newErrors.title = EARNING_MESSAGES.TITLE_REQUIRED;
+    if (!amount.trim()) newErrors.amount = EARNING_MESSAGES.AMOUNT_REQUIRED;
+    else if (parseFloat(amount) <= 0) newErrors.amount = EARNING_MESSAGES.AMOUNT_POSITIVE;
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  const buildEntryTitle = () => (isSalary ? `Salary - ${title.trim()}` : title.trim());
 
   const handleSubmit = async () => {
     if (!validate()) return;
 
     setLoading(true);
     try {
+      const activePersonResult = await getActivePerson(user.id);
+      const activePerson = activePersonResult.success ? activePersonResult.data : null;
+      if (!activePerson) {
+        showAlert('Account Required', 'Please set an active account first from Accounts tab.');
+        setLoading(false);
+        return;
+      }
+
       let invoiceUri = null;
       let invoiceType = null;
       if (invoice) {
@@ -100,19 +85,20 @@ const InvestmentFormScreen = ({ navigation }) => {
         invoiceType = invoice.mimeType || null;
       }
 
-      const personLabel = activePersonName || '';
-      const entryTitle = `${investmentName.trim()} — ${personLabel}`;
+      const entryTitle = buildEntryTitle();
 
       const result = await addEntry({
         userId: user.id,
-        type: 'spending',
-        entryType: 'investment',
+        type: 'earning',
+        entryType: savedEntryType,
         title: entryTitle,
         amount: parseFloat(amount),
+        companyName: isSalary ? title.trim() : null,
+        notes: notes.trim() || null,
         date: formatDateForDB(new Date()),
-        personId: parseInt(selectedPerson, 10),
-        isRecurring,
+        personId: activePerson.id,
         showInAccount: true,
+        isRecurring,
         invoiceUri,
         invoiceType,
       });
@@ -121,20 +107,20 @@ const InvestmentFormScreen = ({ navigation }) => {
         if (isRecurring) {
           await addOrUpdateTemplate({
             userId: user.id,
-            type: 'spending',
-            entryType: 'investment',
+            type: 'earning',
+            entryType: savedEntryType,
             title: entryTitle,
             amount: parseFloat(amount),
-            companyName: personLabel,
-            personId: parseInt(selectedPerson, 10),
+            companyName: isSalary ? title.trim() : null,
+            personId: activePerson.id,
           });
         }
         navigation.goBack();
       } else {
-        showAlert('Error', result.message);
+        showAlert('Error', result.message || EARNING_MESSAGES.ADD_FAILED);
       }
     } catch (error) {
-      showAlert('Error', 'Failed to add investment. Please try again.');
+      showAlert('Error', EARNING_MESSAGES.ADD_FAILED);
     } finally {
       setLoading(false);
     }
@@ -155,88 +141,67 @@ const InvestmentFormScreen = ({ navigation }) => {
         {/* Month Banner */}
         <View style={styles.monthBanner}>
           <Ionicons name="calendar-outline" size={18} color={COLORS.primary} />
-          <Text style={styles.monthBannerText}>{currentMonthName} {currentYear}</Text>
+          <Text style={styles.monthText}>{currentMonthName} {currentYear}</Text>
         </View>
 
         {/* Header Badge */}
         <View style={styles.badge}>
-          <Ionicons name="trending-up-outline" size={20} color={INVEST_COLOR} />
-          <Text style={styles.badgeText}>Investment</Text>
+          <Ionicons name="wallet-outline" size={20} color={COLORS.income} />
+          <Text style={styles.badgeText}>Add Earning</Text>
         </View>
 
         {/* Date/Time Info */}
         <View style={styles.dateTimeCard}>
           <View style={styles.dateTimeItem}>
-            <Ionicons name="calendar" size={16} color={INVEST_COLOR} />
+            <Ionicons name="calendar" size={16} color={COLORS.primary} />
             <Text style={styles.dateTimeText}>{dateStr}</Text>
           </View>
           <View style={styles.dateTimeDivider} />
           <View style={styles.dateTimeItem}>
-            <Ionicons name="time" size={16} color={INVEST_COLOR} />
+            <Ionicons name="time" size={16} color={COLORS.primary} />
             <Text style={styles.dateTimeText}>{timeStr}</Text>
           </View>
         </View>
 
-        {/* Info Note */}
-        <View style={styles.infoNote}>
-          <Ionicons name="information-circle-outline" size={16} color={INVEST_COLOR} />
-          <Text style={styles.infoNoteText}>
-            Investment is money saved aside — it will be deducted from your available balance
-          </Text>
-        </View>
-
-        {/* Manage Accounts Link */}
-        <Pressable
-          style={({ pressed }) => [styles.accountsLink, pressed && { opacity: 0.7 }]}
-          onPress={() => navigation.navigate('Accounts')}
-          role="button"
-        >
-          <Ionicons name="people-outline" size={18} color={INVEST_COLOR} />
-          <Text style={styles.accountsLinkText}>Manage Accounts</Text>
-          <Ionicons name="chevron-forward" size={16} color={INVEST_COLOR} />
-        </Pressable>
-
         {/* Form */}
         <View style={styles.form}>
-          <Text style={styles.inputLabel}>Active Account</Text>
-          {selectedPerson ? (
-            <View style={styles.activeAccountCard}>
-              <View style={styles.activeAccountLeft}>
-                <Ionicons name="checkmark-circle" size={18} color={COLORS.income} />
-                <Text style={styles.activeAccountText}>{activePersonName}</Text>
+          {/* Salary Check */}
+          <View style={styles.salaryCheckCard}>
+            <View style={styles.salaryCheckLeft}>
+              <View style={styles.salaryCheckIcon}>
+                <Ionicons name="cash-outline" size={20} color={COLORS.income} />
               </View>
-              <Pressable onPress={() => navigation.navigate('Accounts')} hitSlop={8} role="button">
-                <Text style={styles.changeAccountText}>Change</Text>
-              </Pressable>
+              <View>
+                <Text style={styles.salaryCheckTitle}>Is this salary?</Text>
+                <Text style={styles.salaryCheckDesc}>
+                  {isSalary ? 'This will be saved as salary entry' : 'This will be saved as normal earning'}
+                </Text>
+              </View>
             </View>
-          ) : null}
-          {errors.person ? <Text style={styles.accountErrorText}>{errors.person}</Text> : null}
-          {!hasAccounts ? (
-            <Pressable
-              style={({ pressed }) => [styles.noAccountsCard, pressed && { opacity: 0.7 }]}
-              onPress={() => navigation.navigate('Accounts')}
-              role="button"
-            >
-              <Ionicons name="alert-circle-outline" size={20} color={INVEST_COLOR} />
-              <View style={styles.noAccountsContent}>
-                <Text style={styles.noAccountsTitle}>No accounts found</Text>
-                <Text style={styles.noAccountsHint}>Tap to add a person / account first</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={INVEST_COLOR} />
-            </Pressable>
-          ) : null}
+            <Switch
+              value={isSalary}
+              onValueChange={(val) => {
+                setIsSalary(val);
+                if (!val) setIsRecurring(false);
+              }}
+              trackColor={{ false: COLORS.border, true: COLORS.income + '80' }}
+              thumbColor={isSalary ? COLORS.income : COLORS.textLight}
+            />
+          </View>
 
+          {/* Earning Detail */}
           <Input
-            label="Investment Name"
-            value={investmentName}
+            label={isSalary ? 'Company Name' : 'Earning Detail'}
+            value={title}
             onChangeText={(text) => {
-              setInvestmentName(text);
-              if (errors.investmentName) setErrors((prev) => ({ ...prev, investmentName: null }));
+              setTitle(text);
+              if (errors.title) setErrors((prev) => ({ ...prev, title: null }));
             }}
-            placeholder="e.g. Gold, Stocks, Savings Account..."
-            error={errors.investmentName}
+            placeholder={isSalary ? 'Enter company name' : 'e.g. Freelance, Bonus, Commission'}
+            error={errors.title}
           />
 
+          {/* Amount */}
           <View style={styles.amountContainer}>
             <Text style={styles.inputLabel}>Amount</Text>
             <View style={styles.amountRow}>
@@ -256,10 +221,26 @@ const InvestmentFormScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Picture Attachment (Optional) */}
+          {/* Notes */}
+          <View style={styles.notesSection}>
+            <View style={styles.labelRow}>
+              <Text style={styles.inputLabel}>Notes</Text>
+              <Text style={styles.optionalTag}>Optional</Text>
+            </View>
+            <Input
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Any additional details..."
+              multiline
+              numberOfLines={3}
+              style={styles.notesInput}
+            />
+          </View>
+
+          {/* Invoice Attachment */}
           <View style={styles.invoiceSection}>
             <View style={styles.labelRow}>
-              <Text style={styles.inputLabel}>Receipt / Proof</Text>
+              <Text style={styles.inputLabel}>Invoice / Receipt</Text>
               <Text style={styles.optionalTag}>Optional</Text>
             </View>
             {!invoice ? (
@@ -270,9 +251,9 @@ const InvestmentFormScreen = ({ navigation }) => {
               >
                 <View style={styles.invoicePickerContent}>
                   <View style={styles.invoiceIconCircle}>
-                    <Ionicons name="camera-outline" size={28} color={INVEST_COLOR} />
+                    <Ionicons name="camera-outline" size={28} color={COLORS.primary} />
                   </View>
-                  <Text style={styles.invoicePickerTitle}>Attach a picture</Text>
+                  <Text style={styles.invoicePickerTitle}>Tap to attach</Text>
                   <Text style={styles.invoicePickerHint}>Camera, gallery, or document</Text>
                 </View>
               </Pressable>
@@ -309,38 +290,42 @@ const InvestmentFormScreen = ({ navigation }) => {
             )}
           </View>
 
-          {/* Recurring Toggle */}
-          <View style={styles.recurringCard}>
-            <View style={styles.recurringLeft}>
-              <View style={styles.recurringIcon}>
-                <Ionicons name="repeat" size={22} color={INVEST_COLOR} />
+          {/* Recurring Toggle - only for salary */}
+          {isSalary && (
+            <>
+              <View style={styles.recurringCard}>
+                <View style={styles.recurringLeft}>
+                  <View style={styles.recurringIcon}>
+                    <Ionicons name="repeat" size={22} color={COLORS.income} />
+                  </View>
+                  <View>
+                    <Text style={styles.recurringTitle}>Monthly Recurring</Text>
+                    <Text style={styles.recurringDesc}>Add this amount every month automatically</Text>
+                  </View>
+                </View>
+                <Switch
+                  value={isRecurring}
+                  onValueChange={setIsRecurring}
+                  trackColor={{ false: COLORS.border, true: COLORS.income + '80' }}
+                  thumbColor={isRecurring ? COLORS.income : COLORS.textLight}
+                />
               </View>
-              <View>
-                <Text style={styles.recurringTitle}>Monthly Recurring</Text>
-                <Text style={styles.recurringDesc}>Repeat this investment every month</Text>
-              </View>
-            </View>
-            <Switch
-              value={isRecurring}
-              onValueChange={setIsRecurring}
-              trackColor={{ false: COLORS.border, true: INVEST_COLOR + '80' }}
-              thumbColor={isRecurring ? INVEST_COLOR : COLORS.textLight}
-            />
-          </View>
 
-          {isRecurring && (
-            <View style={styles.recurringNote}>
-              <Ionicons name="information-circle-outline" size={16} color={INVEST_COLOR} />
-              <Text style={styles.recurringNoteText}>
-                This amount will be automatically added at the start of each month
-              </Text>
-            </View>
+              {isRecurring && (
+                <View style={styles.recurringNote}>
+                  <Ionicons name="information-circle-outline" size={16} color={COLORS.info} />
+                  <Text style={styles.recurringNoteText}>
+                    This amount will be automatically added at the start of each month
+                  </Text>
+                </View>
+              )}
+            </>
           )}
         </View>
 
         {/* Submit */}
         <Button
-          title="Add Investment"
+          title={`Add ${isSalary ? 'Salary' : 'Earning'} Entry`}
           onPress={handleSubmit}
           loading={loading}
           style={styles.submitBtn}
@@ -351,7 +336,7 @@ const InvestmentFormScreen = ({ navigation }) => {
         visible={pickerVisible}
         onClose={() => setPickerVisible(false)}
         onFilePicked={(file) => setInvoice(file)}
-        accentColor={INVEST_COLOR}
+        accentColor={COLORS.income}
       />
     </KeyboardAvoidingView>
   );
@@ -378,7 +363,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.primary + '20',
   },
-  monthBannerText: {
+  monthText: {
     fontSize: FONTS.sizes.base,
     fontWeight: FONTS.weights.semiBold,
     color: COLORS.primary,
@@ -387,7 +372,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: INVEST_COLOR + '14',
+    backgroundColor: COLORS.income + '14',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
@@ -397,7 +382,7 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: FONTS.sizes.md,
     fontWeight: FONTS.weights.semiBold,
-    color: INVEST_COLOR,
+    color: COLORS.income,
   },
   dateTimeCard: {
     flexDirection: 'row',
@@ -405,7 +390,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderRadius: 12,
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: COLORS.borderLight,
   },
@@ -427,39 +412,60 @@ const styles = StyleSheet.create({
     fontWeight: FONTS.weights.medium,
     color: COLORS.text,
   },
-  infoNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: INVEST_COLOR + '10',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 24,
-    gap: 8,
-  },
-  infoNoteText: {
-    fontSize: FONTS.sizes.sm,
-    color: INVEST_COLOR,
-    flex: 1,
-  },
-  accountsLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: INVEST_COLOR + '08',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 24,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: INVEST_COLOR + '20',
-  },
-  accountsLinkText: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semiBold,
-    color: INVEST_COLOR,
-    flex: 1,
-  },
   form: {
     gap: 0,
+  },
+  salaryCheckCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  salaryCheckLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  salaryCheckIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.income + '14',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  salaryCheckTitle: {
+    fontSize: FONTS.sizes.md,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.text,
+  },
+  salaryCheckDesc: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+    marginTop: 1,
+  },
+  typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.income + '12',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  typeChipText: {
+    fontSize: FONTS.sizes.sm,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.income,
   },
   inputLabel: {
     fontSize: FONTS.sizes.md,
@@ -487,10 +493,11 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   currencyTag: {
-    backgroundColor: INVEST_COLOR,
+    backgroundColor: COLORS.income,
     paddingHorizontal: 16,
     paddingVertical: 15,
     borderRadius: 12,
+    marginTop: 0,
   },
   currencyText: {
     fontSize: FONTS.sizes.base,
@@ -503,12 +510,19 @@ const styles = StyleSheet.create({
   amountInput: {
     marginBottom: 0,
   },
+  notesSection: {
+    marginBottom: 16,
+  },
+  notesInput: {
+    minHeight: 70,
+    textAlignVertical: 'top',
+  },
   invoiceSection: {
     marginBottom: 16,
   },
   invoicePickerBtn: {
     borderWidth: 2,
-    borderColor: INVEST_COLOR + '30',
+    borderColor: COLORS.income + '30',
     borderStyle: 'dashed',
     borderRadius: 14,
     padding: 24,
@@ -516,7 +530,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
   },
   invoicePickerBtnPressed: {
-    backgroundColor: INVEST_COLOR + '08',
+    backgroundColor: COLORS.income + '08',
   },
   invoicePickerContent: {
     alignItems: 'center',
@@ -526,7 +540,7 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: INVEST_COLOR + '12',
+    backgroundColor: COLORS.income + '12',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
@@ -591,64 +605,6 @@ const styles = StyleSheet.create({
   removeInvoiceBtn: {
     padding: 4,
   },
-  noAccountsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: INVEST_COLOR + '08',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 16,
-    gap: 10,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: INVEST_COLOR + '40',
-  },
-  noAccountsContent: {
-    flex: 1,
-  },
-  noAccountsTitle: {
-    fontSize: FONTS.sizes.md,
-    fontWeight: FONTS.weights.semiBold,
-    color: INVEST_COLOR,
-  },
-  noAccountsHint: {
-    fontSize: FONTS.sizes.xs,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  activeAccountCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.borderLight,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 4,
-  },
-  activeAccountLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  activeAccountText: {
-    fontSize: FONTS.sizes.base,
-    fontWeight: FONTS.weights.semiBold,
-    color: COLORS.text,
-  },
-  changeAccountText: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.primary,
-    fontWeight: FONTS.weights.semiBold,
-  },
-  accountErrorText: {
-    fontSize: FONTS.sizes.sm,
-    color: COLORS.danger,
-    marginTop: 4,
-    marginBottom: 8,
-  },
   recurringCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -670,7 +626,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: INVEST_COLOR + '14',
+    backgroundColor: COLORS.income + '14',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -688,7 +644,7 @@ const styles = StyleSheet.create({
   recurringNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: INVEST_COLOR + '10',
+    backgroundColor: COLORS.info + '10',
     padding: 12,
     borderRadius: 10,
     marginTop: 12,
@@ -696,13 +652,13 @@ const styles = StyleSheet.create({
   },
   recurringNoteText: {
     fontSize: FONTS.sizes.sm,
-    color: INVEST_COLOR,
+    color: COLORS.info,
     flex: 1,
   },
   submitBtn: {
     marginTop: 32,
-    backgroundColor: INVEST_COLOR,
+    backgroundColor: COLORS.income,
   },
 });
 
-export default InvestmentFormScreen;
+export default EarningFormScreen;

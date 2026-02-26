@@ -28,6 +28,7 @@ const HomeScreen = ({ navigation }) => {
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState({ totalEarnings: 0, totalSpendings: 0, amountLeft: 0 });
   const [refreshing, setRefreshing] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   const isCurrentMonth = year === new Date().getFullYear() && month === new Date().getMonth() + 1;
 
@@ -227,13 +228,61 @@ const HomeScreen = ({ navigation }) => {
         }
       />
 
+      {showQuickAdd ? (
+        <Pressable
+          style={styles.quickAddOverlay}
+          onPress={() => setShowQuickAdd(false)}
+          role="button"
+          aria-label="Close quick add menu"
+        />
+      ) : null}
+
+      {showQuickAdd ? (
+        <View style={styles.quickAddMenu}>
+          <Pressable
+            style={({ pressed }) => [styles.quickAddOption, pressed && { opacity: 0.85 }]}
+            onPress={() => {
+              setShowQuickAdd(false);
+              navigation.navigate('EarningForm');
+            }}
+            role="button"
+          >
+            <View style={[styles.quickAddIconWrap, { backgroundColor: COLORS.income + '16' }]}>
+              <Ionicons name="wallet-outline" size={18} color={COLORS.income} />
+            </View>
+            <View style={styles.quickAddTextWrap}>
+              <Text style={styles.quickAddTitle}>Add Earning</Text>
+              <Text style={styles.quickAddSubtitle}>Salary or normal earning</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.quickAddOption, pressed && { opacity: 0.85 }]}
+            onPress={() => {
+              setShowQuickAdd(false);
+              navigation.navigate('AddExpense');
+            }}
+            role="button"
+          >
+            <View style={[styles.quickAddIconWrap, { backgroundColor: COLORS.expense + '16' }]}>
+              <Ionicons name="cart-outline" size={18} color={COLORS.expense} />
+            </View>
+            <View style={styles.quickAddTextWrap}>
+              <Text style={styles.quickAddTitle}>Add Expense</Text>
+              <Text style={styles.quickAddSubtitle}>Track spending by category</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
+          </Pressable>
+        </View>
+      ) : null}
+
       <Pressable
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-        onPress={() => navigation.navigate('AddEntry')}
+        onPress={() => setShowQuickAdd((prev) => !prev)}
         role="button"
         aria-label="Add new entry"
       >
-        <Ionicons name="add" size={30} color={COLORS.textWhite} />
+        <Ionicons name={showQuickAdd ? 'close' : 'add'} size={30} color={COLORS.textWhite} />
       </Pressable>
 
     </View>
@@ -254,7 +303,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 20,
-    paddingTop: 50,
+    paddingTop: 8,
   },
   monthNav: {
     flexDirection: 'row',
@@ -432,6 +481,51 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     boxShadow: '0px 4px 12px rgba(108, 99, 255, 0.4)',
+  },
+  quickAddOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
+  },
+  quickAddMenu: {
+    position: 'absolute',
+    right: 24,
+    bottom: 94,
+    gap: 10,
+    alignItems: 'flex-end',
+  },
+  quickAddOption: {
+    minWidth: 230,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    backgroundColor: COLORS.surface,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: COLORS.border + '90',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    boxShadow: '0px 6px 16px rgba(0, 0, 0, 0.14)',
+  },
+  quickAddIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickAddTextWrap: {
+    flex: 1,
+  },
+  quickAddTitle: {
+    fontSize: FONTS.sizes.base,
+    fontWeight: FONTS.weights.semiBold,
+    color: COLORS.text,
+  },
+  quickAddSubtitle: {
+    fontSize: FONTS.sizes.xs,
+    color: COLORS.textSecondary,
+    marginTop: 1,
   },
   fabPressed: {
     opacity: 0.85,

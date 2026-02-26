@@ -15,23 +15,26 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Button, Input, Dropdown, AttachmentPicker } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
+import { EXPENSE_ENTRY_CATEGORIES } from '../../constants/categories';
 import { addEntry } from '../../services/entryService';
 import { addOrUpdateTemplate } from '../../services/recurringService';
-import { getPersons } from '../../services/personService';
+import { getPersons, getActivePerson } from '../../services/personService';
 import { saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
+import { EXPENSE_MESSAGES } from '../../messages/expenseMessages';
 
 const AddExpenseScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [expenseName, setExpenseName] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('misc');
   const [amount, setAmount] = useState('');
   const [selectedPerson, setSelectedPerson] = useState('');
-  const [personOptions, setPersonOptions] = useState([]);
+  const [activePersonName, setActivePersonName] = useState('');
+  const [hasAccounts, setHasAccounts] = useState(false);
   const [invoice, setInvoice] = useState(null);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [showInAccount, setShowInAccount] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -40,9 +43,18 @@ const AddExpenseScreen = ({ navigation }) => {
     useCallback(() => {
       const loadPersons = async () => {
         if (!user) return;
-        const result = await getPersons(user.id);
-        if (result.success) {
-          setPersonOptions(result.data.map((p) => ({ value: String(p.id), label: p.name })));
+        const [personsResult, activeResult] = await Promise.all([
+          getPersons(user.id),
+          getActivePerson(user.id),
+        ]);
+
+        if (personsResult.success) {
+          setHasAccounts(personsResult.data.length > 0);
+        }
+
+        if (activeResult.success && activeResult.data) {
+          setSelectedPerson(String(activeResult.data.id));
+          setActivePersonName(activeResult.data.name);
         }
       };
       loadPersons();
@@ -69,9 +81,13 @@ const AddExpenseScreen = ({ navigation }) => {
 
   const validate = () => {
     const newErrors = {};
-    if (!expenseName.trim()) newErrors.expenseName = 'Expense name is required';
-    if (!amount.trim()) newErrors.amount = 'Amount is required';
-    else if (parseFloat(amount) <= 0) newErrors.amount = 'Amount must be greater than 0';
+    if (!expenseName.trim()) newErrors.expenseName = EXPENSE_MESSAGES.TITLE_REQUIRED;
+    if (!selectedCategory) newErrors.category = 'Please select a category.';
+    if (!amount.trim()) newErrors.amount = EXPENSE_MESSAGES.AMOUNT_REQUIRED;
+    else if (parseFloat(amount) <= 0) newErrors.amount = EXPENSE_MESSAGES.AMOUNT_POSITIVE;
+    if (!selectedPerson) {
+      newErrors.account = hasAccounts ? EXPENSE_MESSAGES.ACCOUNT_REQUIRED : EXPENSE_MESSAGES.ACCOUNT_MISSING;
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -88,19 +104,19 @@ const AddExpenseScreen = ({ navigation }) => {
         invoiceType = invoice.mimeType || null;
       }
 
-      const personId = selectedPerson ? parseInt(selectedPerson, 10) : null;
-      const personLabel = personOptions.find((p) => p.value === selectedPerson)?.label || '';
+      const personId = parseInt(selectedPerson, 10);
+      const personLabel = activePersonName || '';
 
       const result = await addEntry({
         userId: user.id,
         type: 'spending',
-        entryType: 'expense',
+        entryType: selectedCategory,
         title: expenseName.trim(),
         amount: parseFloat(amount),
         date: formatDateForDB(new Date()),
         personId,
         isRecurring,
-        showInAccount: personId ? showInAccount : true,
+        showInAccount: true,
         invoiceUri,
         invoiceType,
       });
@@ -110,7 +126,7 @@ const AddExpenseScreen = ({ navigation }) => {
           await addOrUpdateTemplate({
             userId: user.id,
             type: 'spending',
-            entryType: 'expense',
+            entryType: selectedCategory,
             title: expenseName.trim(),
             amount: parseFloat(amount),
             companyName: personLabel || undefined,
@@ -178,6 +194,18 @@ const AddExpenseScreen = ({ navigation }) => {
             error={errors.expenseName}
           />
 
+          <Dropdown
+            label="Category"
+            value={selectedCategory}
+            options={EXPENSE_ENTRY_CATEGORIES}
+            onSelect={(val) => {
+              setSelectedCategory(val);
+              if (errors.category) setErrors((prev) => ({ ...prev, category: null }));
+            }}
+            placeholder="Select expense category"
+            error={errors.category}
+          />
+
           <View style={styles.amountContainer}>
             <Text style={styles.inputLabel}>Amount</Text>
             <View style={styles.amountRow}>
@@ -197,53 +225,27 @@ const AddExpenseScreen = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Account (Optional) */}
+          {/* Account (Required) */}
           <View style={styles.accountSection}>
-            <View style={styles.labelRow}>
-              <Text style={styles.inputLabel}>Account (Person)</Text>
-              <Text style={styles.optionalTag}>Optional</Text>
-            </View>
-            <Dropdown
-              value={selectedPerson}
-              options={personOptions}
-              onSelect={(val) => {
-                setSelectedPerson(val);
-                if (val && !showInAccount) setShowInAccount(true);
-              }}
-              placeholder={personOptions.length > 0 ? 'Select an account (optional)' : 'No accounts available'}
-            />
+            <Text style={styles.inputLabel}>Account (Person)</Text>
             {selectedPerson ? (
-              <Pressable
-                style={styles.clearAccount}
-                onPress={() => { setSelectedPerson(''); setShowInAccount(false); }}
-                hitSlop={8}
-              >
-                <Ionicons name="close-circle" size={16} color={COLORS.textLight} />
-                <Text style={styles.clearAccountText}>Clear account</Text>
-              </Pressable>
+              <View style={styles.activeAccountCard}>
+                <View style={styles.activeAccountLeft}>
+                  <Ionicons name="checkmark-circle" size={18} color={COLORS.income} />
+                  <Text style={styles.activeAccountText}>{activePersonName}</Text>
+                </View>
+                <Pressable onPress={() => navigation.navigate('Accounts')} hitSlop={8} role="button">
+                  <Text style={styles.changeAccountText}>Change</Text>
+                </Pressable>
+              </View>
             ) : null}
-          </View>
-
-          {/* Show in Account Toggle */}
-          <View style={[styles.accountToggleCard, !selectedPerson && styles.accountToggleDisabled]}>
-            <View style={styles.accountToggleLeft}>
-              <View style={[styles.accountToggleIcon, !selectedPerson && { opacity: 0.4 }]}>
-                <Ionicons name="eye-outline" size={20} color={selectedPerson ? COLORS.primary : COLORS.textLight} />
+            {errors.account ? <Text style={styles.accountErrorText}>{errors.account}</Text> : null}
+            {!hasAccounts ? (
+              <View style={styles.accountHint}>
+                <Ionicons name="information-circle-outline" size={14} color={COLORS.primary} />
+                <Text style={styles.accountHintText}>Add an account first from Accounts tab.</Text>
               </View>
-              <View>
-                <Text style={[styles.accountToggleTitle, !selectedPerson && { color: COLORS.textLight }]}>Show in Account</Text>
-                <Text style={[styles.accountToggleDesc, !selectedPerson && { color: COLORS.textLight }]}>
-                  {selectedPerson ? 'Visible in account profile' : 'Select an account first'}
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={selectedPerson ? showInAccount : false}
-              onValueChange={setShowInAccount}
-              disabled={!selectedPerson}
-              trackColor={{ false: COLORS.border, true: COLORS.primary + '80' }}
-              thumbColor={selectedPerson && showInAccount ? COLORS.primary : COLORS.textLight}
-            />
+            ) : null}
           </View>
 
           {/* Picture Attachment (Optional) */}
@@ -465,54 +467,47 @@ const styles = StyleSheet.create({
   accountSection: {
     marginBottom: 16,
   },
-  clearAccount: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 6,
-    alignSelf: 'flex-end',
-  },
-  clearAccountText: {
-    fontSize: FONTS.sizes.xs,
-    color: COLORS.textLight,
-  },
-  accountToggleCard: {
+  activeAccountCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: COLORS.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
     borderWidth: 1,
     borderColor: COLORS.borderLight,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    marginTop: 6,
   },
-  accountToggleDisabled: {
-    opacity: 0.6,
-  },
-  accountToggleLeft: {
+  activeAccountLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    gap: 12,
+    gap: 8,
   },
-  accountToggleIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.primary + '12',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  accountToggleTitle: {
-    fontSize: FONTS.sizes.md,
+  activeAccountText: {
+    fontSize: FONTS.sizes.base,
     fontWeight: FONTS.weights.semiBold,
     color: COLORS.text,
-    marginBottom: 1,
   },
-  accountToggleDesc: {
+  changeAccountText: {
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.primary,
+    fontWeight: FONTS.weights.semiBold,
+  },
+  accountErrorText: {
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.danger,
+    marginTop: 4,
+  },
+  accountHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  accountHintText: {
     fontSize: FONTS.sizes.xs,
-    color: COLORS.textSecondary,
+    color: COLORS.primary,
   },
   invoiceSection: {
     marginBottom: 16,

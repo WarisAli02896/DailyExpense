@@ -28,7 +28,13 @@ export const EARNING_TYPES = [
   { value: 'salary', label: 'Salary', icon: 'cash-outline' },
   { value: 'bonus', label: 'Bonus', icon: 'gift-outline' },
   { value: 'overtime', label: 'Overtime', icon: 'time-outline' },
+  { value: 'freelance', label: 'Freelance', icon: 'laptop-outline' },
+  { value: 'commission', label: 'Commission', icon: 'pie-chart-outline' },
+  { value: 'rental', label: 'Rental Income', icon: 'home-outline' },
+  { value: 'profit', label: 'Business Profit', icon: 'briefcase-outline' },
+  { value: 'refund', label: 'Refund', icon: 'return-down-back-outline' },
   { value: 'advance', label: 'Advance', icon: 'arrow-forward-circle-outline' },
+  { value: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline' },
 ];
 
 export const BILL_TYPES = [
@@ -40,9 +46,15 @@ export const BILL_TYPES = [
   { value: 'medicines', label: 'Medicines', icon: 'medkit-outline' },
 ];
 
+export const EXPENSE_ENTRY_CATEGORIES = [
+  { value: 'misc', label: 'Misc', icon: 'apps-outline' },
+  { value: 'credit_card_bill', label: 'Credit Card Bill', icon: 'card-outline' },
+  { value: 'utilities_bill', label: 'Utilities Bill', icon: 'flash-outline' },
+  { value: 'investment', label: 'Investment', icon: 'trending-up-outline' },
+  { value: 'other', label: 'Other', icon: 'ellipsis-horizontal-outline' },
+];
+
 export const ENTRY_TYPES = [
-  { id: 'salary', label: 'Salary', icon: 'cash-outline', color: '#4CAF50', type: 'earning' },
+  { id: 'earning', label: 'Earning', icon: 'wallet-outline', color: '#4CAF50', type: 'earning' },
   { id: 'expense', label: 'Expense', icon: 'cart-outline', color: '#F44336', type: 'spending' },
-  { id: 'investment', label: 'Investment', icon: 'trending-up-outline', color: '#7C4DFF', type: 'spending' },
-  { id: 'bills', label: 'Bills', icon: 'flash-outline', color: '#FF9800', type: 'spending' },
 ];

@@ -91,7 +91,7 @@ const LoginScreen = ({ navigation }) => {
             placeholder="Enter your username"
             error={errors.username}
             maxLength={16}
-            autoCapitalize="none"
+            autoCapitalize="words"
           />
 
           <Input

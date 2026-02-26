@@ -5,19 +5,25 @@ import { AUTH_MESSAGES } from '../messages/authMessages';
 export const registerUser = async ({ username, pin, currency = 'PKR' }) => {
   try {
     const db = await getDBConnection();
+    const normalizedUsername = username.trim();
 
     const existing = await db.getFirstAsync(
-      'SELECT id FROM users WHERE username = ?',
-      [username.toLowerCase()]
+      'SELECT id FROM users WHERE LOWER(username) = LOWER(?)',
+      [normalizedUsername]
     );
 
     if (existing) {
       return { success: false, message: AUTH_MESSAGES.USERNAME_EXISTS };
     }
 
-    await db.runAsync(
+    const insertResult = await db.runAsync(
       'INSERT INTO users (username, pin, currency) VALUES (?, ?, ?)',
-      [username.toLowerCase(), pin, currency]
+      [normalizedUsername, pin, currency]
+    );
+
+    await db.runAsync(
+      'INSERT INTO persons (user_id, name, is_default, is_locked, is_active) VALUES (?, ?, 1, 1, 1)',
+      [insertResult.lastInsertRowId, normalizedUsername]
     );
 
     return { success: true, message: AUTH_MESSAGES.REGISTER_SUCCESS };
@@ -30,10 +36,11 @@ export const registerUser = async ({ username, pin, currency = 'PKR' }) => {
 export const loginUser = async ({ username, pin }) => {
   try {
     const db = await getDBConnection();
+    const normalizedUsername = username.trim();
 
     const user = await db.getFirstAsync(
-      'SELECT id, username, currency FROM users WHERE username = ? AND pin = ?',
-      [username.toLowerCase(), pin]
+      'SELECT id, username, currency FROM users WHERE LOWER(username) = LOWER(?) AND pin = ?',
+      [normalizedUsername, pin]
     );
 
     if (!user) {
@@ -62,10 +69,25 @@ export const logoutUser = async () => {
 export const updateUserProfile = async (userId, { username, currency }) => {
   try {
     const db = await getDBConnection();
+    const normalizedUsername = username.trim();
+
+    const existing = await db.getFirstAsync(
+      'SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ?',
+      [normalizedUsername, userId]
+    );
+
+    if (existing) {
+      return { success: false, message: AUTH_MESSAGES.USERNAME_EXISTS };
+    }
 
     await db.runAsync(
       'UPDATE users SET username = ?, currency = ? WHERE id = ?',
-      [username.toLowerCase(), currency, userId]
+      [normalizedUsername, currency, userId]
+    );
+
+    await db.runAsync(
+      'UPDATE persons SET name = ? WHERE user_id = ? AND is_default = 1',
+      [normalizedUsername, userId]
     );
 
     const updatedUser = await db.getFirstAsync(
