@@ -33,7 +33,6 @@ const SettingsScreen = ({ navigation }) => {
     webClientId: GOOGLE_AUTH_CONFIG.webClientId,
     expoClientId: GOOGLE_AUTH_CONFIG.webClientId,
     scopes: [DRIVE_SCOPE],
-    responseType: 'token',
   });
 
   useEffect(() => {
@@ -73,7 +72,7 @@ const SettingsScreen = ({ navigation }) => {
 
     setIsConnectingGoogle(true);
     try {
-      await promptAsync({ useProxy: true });
+      await promptAsync();
     } catch (error) {
       showAlert('Error', BACKUP_MESSAGES.GOOGLE_CONNECT_FAILED);
     } finally {

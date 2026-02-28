@@ -2,6 +2,7 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import RestoreBackupScreen from '../screens/auth/RestoreBackupScreen';
 import { useAuth } from '../hooks/useAuth';
 import { COLORS } from '../constants/colors';
 
@@ -20,6 +21,7 @@ const AuthNavigator = () => {
     >
       {!userExists ? (
         <>
+          <Stack.Screen name="RestoreBackup" component={RestoreBackupScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
         </>

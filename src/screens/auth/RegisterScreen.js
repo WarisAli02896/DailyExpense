@@ -129,6 +129,13 @@ const RegisterScreen = ({ navigation }) => {
             style={styles.registerButton}
           />
 
+          <Button
+            title="Restore From Google Drive"
+            onPress={() => navigation.replace('RestoreBackup')}
+            variant="outline"
+            style={styles.restoreButton}
+          />
+
           <View style={styles.footerRow}>
             <Text style={styles.footerText}>Already have an account? </Text>
             <Text
@@ -220,6 +227,9 @@ const styles = StyleSheet.create({
   },
   registerButton: {
     marginTop: 8,
+  },
+  restoreButton: {
+    marginTop: 10,
   },
   footerRow: {
     flexDirection: 'row',
