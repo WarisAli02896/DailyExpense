@@ -154,7 +154,7 @@ const HomeScreen = ({ navigation }) => {
             </View>
             <View>
               <Text style={styles.balanceItemLabel}>Earnings</Text>
-              <Text style={[styles.balanceItemValue, { color: COLORS.income }]}>
+              <Text style={styles.balanceItemValue}>
                 Rs. {formatAmount(summary.totalEarnings)}
               </Text>
             </View>
@@ -168,7 +168,7 @@ const HomeScreen = ({ navigation }) => {
             </View>
             <View>
               <Text style={styles.balanceItemLabel}>Spendings</Text>
-              <Text style={[styles.balanceItemValue, { color: COLORS.expense }]}>
+              <Text style={styles.balanceItemValue}>
                 Rs. {formatAmount(summary.totalSpendings)}
               </Text>
             </View>
@@ -380,6 +380,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   balanceDot: {
     width: 34,
@@ -391,7 +395,7 @@ const styles = StyleSheet.create({
   },
   balanceItemLabel: {
     fontSize: FONTS.sizes.xs,
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(255, 255, 255, 0.9)',
     marginBottom: 2,
   },
   balanceItemValue: {

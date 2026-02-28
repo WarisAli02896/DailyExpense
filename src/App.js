@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './context/AuthContext';
 import { ExpenseProvider } from './context/ExpenseContext';
 import RootNavigator from './navigation';
+import SnackbarHost from './components/common/SnackbarHost';
 import { initializeDatabase } from './services/database';
 import { COLORS } from './constants/colors';
 
@@ -50,6 +51,7 @@ const App = () => {
         <ExpenseProvider>
           <StatusBar style="auto" />
           <RootNavigator />
+          <SnackbarHost />
         </ExpenseProvider>
       </AuthProvider>
     </SafeAreaProvider>
