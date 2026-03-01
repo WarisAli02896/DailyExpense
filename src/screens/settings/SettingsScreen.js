@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { Button } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
-import { GOOGLE_AUTH_CONFIG } from '../../constants/googleDrive';
+import { GOOGLE_AUTH_CONFIG, GOOGLE_NATIVE_REDIRECT_URI } from '../../constants/googleDrive';
 import { useAuth } from '../../hooks/useAuth';
 import { logoutUser } from '../../services/authService';
 import { exportUserBackup, restoreUserBackup } from '../../services/backupService';
@@ -28,24 +29,47 @@ const SettingsScreen = ({ navigation }) => {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
+  const redirectUri = makeRedirectUri({
+    native: GOOGLE_NATIVE_REDIRECT_URI,
+  });
+
   const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId: GOOGLE_AUTH_CONFIG.androidClientId,
     webClientId: GOOGLE_AUTH_CONFIG.webClientId,
-    expoClientId: GOOGLE_AUTH_CONFIG.webClientId,
     scopes: [DRIVE_SCOPE],
+    redirectUri,
   });
 
   useEffect(() => {
     if (!response) return;
 
     if (response.type === 'success') {
-      setAccessToken(response.authentication?.accessToken || '');
+      const token =
+        response.authentication?.accessToken ||
+        response.params?.access_token ||
+        '';
+
+      if (!token) {
+        setAccessToken('');
+        showAlert('Error', BACKUP_MESSAGES.GOOGLE_CONNECT_FAILED);
+        return;
+      }
+
+      setAccessToken(token);
       showAlert('Success', BACKUP_MESSAGES.GOOGLE_CONNECT_SUCCESS);
       return;
     }
 
     if (response.type === 'error') {
-      showAlert('Error', BACKUP_MESSAGES.GOOGLE_CONNECT_FAILED);
+      const details =
+        response.error?.message ||
+        response.params?.error_description ||
+        response.params?.error ||
+        '';
+      showAlert(
+        'Error',
+        details ? `${BACKUP_MESSAGES.GOOGLE_CONNECT_FAILED}\n${details}` : BACKUP_MESSAGES.GOOGLE_CONNECT_FAILED
+      );
     }
   }, [response]);
 
@@ -72,7 +96,9 @@ const SettingsScreen = ({ navigation }) => {
 
     setIsConnectingGoogle(true);
     try {
-      await promptAsync();
+      await promptAsync({
+        showInRecents: true,
+      });
     } catch (error) {
       showAlert('Error', BACKUP_MESSAGES.GOOGLE_CONNECT_FAILED);
     } finally {

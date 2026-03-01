@@ -3,5 +3,11 @@ export const GOOGLE_AUTH_CONFIG = {
   webClientId: '55186052883-ib96nse79ign9kg8pbtd8jf3jbi27hjv.apps.googleusercontent.com',
 };
 
+const androidClientIdWithoutDomain = GOOGLE_AUTH_CONFIG.androidClientId.replace(
+  '.apps.googleusercontent.com',
+  ''
+);
+export const GOOGLE_NATIVE_REDIRECT_URI = `com.googleusercontent.apps.${androidClientIdWithoutDomain}:/oauthredirect`;
+
 export const DRIVE_APPDATA_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 export const DRIVE_BACKUP_FILE_NAME = 'dailyexpense-backup.json';
