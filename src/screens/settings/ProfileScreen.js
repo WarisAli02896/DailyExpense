@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../../services/authService';
 import { validateUsername } from '../../utils/validators';
 import { showAlert } from '../../utils/alertUtils';
+import { AUTH_MESSAGES } from '../../messages/authMessages';
 
 const ProfileScreen = () => {
   const { user, updateUser } = useAuth();
@@ -47,7 +48,7 @@ const ProfileScreen = () => {
         showAlert('Error', result.message);
       }
     } catch (err) {
-      showAlert('Error', 'Failed to update profile. Please try again.');
+      showAlert('Error', AUTH_MESSAGES.PROFILE_UPDATE_FAILED);
     } finally {
       setLoading(false);
     }

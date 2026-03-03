@@ -17,6 +17,7 @@ import {
   uploadBackupToDrive,
 } from '../../services/googleDriveBackupService';
 import { BACKUP_MESSAGES } from '../../messages/backupMessages';
+import { AUTH_MESSAGES } from '../../messages/authMessages';
 import { showAlert, showConfirm } from '../../utils/alertUtils';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -79,12 +80,13 @@ const SettingsScreen = ({ navigation }) => {
       try {
         const result = await logoutUser();
         if (result.success) {
+          showAlert('Success', result.message || AUTH_MESSAGES.LOGOUT_SUCCESS);
           logout();
         } else {
           showAlert('Error', result.message);
         }
       } catch (error) {
-        showAlert('Error', 'Logout failed. Please try again.');
+        showAlert('Error', AUTH_MESSAGES.LOGOUT_FAILED);
       } finally {
         setLoading(false);
       }

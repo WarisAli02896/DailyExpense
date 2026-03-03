@@ -115,6 +115,7 @@ const EarningFormScreen = ({ navigation }) => {
             personId: activePerson.id,
           });
         }
+        showAlert('Success', isSalary ? EARNING_MESSAGES.SALARY_ADD_SUCCESS : EARNING_MESSAGES.ADD_SUCCESS);
         navigation.goBack();
       } else {
         showAlert('Error', result.message || EARNING_MESSAGES.ADD_FAILED);

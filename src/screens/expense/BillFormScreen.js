@@ -20,6 +20,7 @@ import { getActivePerson } from '../../services/personService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
+import { EXPENSE_MESSAGES } from '../../messages/expenseMessages';
 
 const BILL_COLOR = '#FF9800';
 
@@ -116,12 +117,13 @@ const BillFormScreen = ({ navigation }) => {
       });
 
       if (result.success) {
+        showAlert('Success', EXPENSE_MESSAGES.BILL_ADD_SUCCESS);
         navigation.goBack();
       } else {
         showAlert('Error', result.message);
       }
     } catch (error) {
-      showAlert('Error', 'Failed to add bill. Please try again.');
+      showAlert('Error', EXPENSE_MESSAGES.ADD_FAILED);
     } finally {
       setLoading(false);
     }

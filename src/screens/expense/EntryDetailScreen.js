@@ -21,6 +21,7 @@ import { deleteEntry, updateEntry } from '../../services/entryService';
 import { saveInvoice, formatFileSize, getFileType } from '../../services/fileService';
 import { Button, Dropdown, AttachmentPicker } from '../../components/common';
 import { showAlert, showConfirm } from '../../utils/alertUtils';
+import { COMMON_MESSAGES } from '../../messages/commonMessages';
 
 const TYPE_OPTIONS = [
   { value: 'earning', label: 'Earning', icon: 'arrow-down-circle-outline' },
@@ -113,9 +114,10 @@ const EntryDetailScreen = ({ route, navigation }) => {
         setDeleting(true);
         const result = await deleteEntry(entry.id);
         if (result.success) {
+          showAlert('Success', result.message || COMMON_MESSAGES.DELETE_SUCCESS);
           navigation.goBack();
         } else {
-          showAlert('Error', 'Failed to delete entry.');
+          showAlert('Error', result.message || COMMON_MESSAGES.DELETE_FAILED);
           setDeleting(false);
         }
       }
@@ -191,12 +193,12 @@ const EntryDetailScreen = ({ route, navigation }) => {
         setEditInvoice(null);
         setInvoiceRemoved(false);
         setEditing(false);
-        showAlert('Success', 'Entry updated successfully!');
+        showAlert('Success', result.message || COMMON_MESSAGES.UPDATE_SUCCESS);
       } else {
-        showAlert('Error', result.message);
+        showAlert('Error', result.message || COMMON_MESSAGES.UPDATE_FAILED);
       }
     } catch (error) {
-      showAlert('Error', 'Failed to save changes.');
+      showAlert('Error', COMMON_MESSAGES.UPDATE_FAILED);
     }
     setSaving(false);
   };

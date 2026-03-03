@@ -15,6 +15,7 @@ import { registerUser } from '../../services/authService';
 import { validateRegisterForm } from '../../utils/validators';
 import { useAuth } from '../../hooks/useAuth';
 import { showAlert } from '../../utils/alertUtils';
+import { AUTH_MESSAGES } from '../../messages/authMessages';
 
 const RegisterScreen = ({ navigation }) => {
   const { markUserCreated } = useAuth();
@@ -52,13 +53,14 @@ const RegisterScreen = ({ navigation }) => {
       const result = await registerUser({ username, pin });
 
       if (result.success) {
+        showAlert('Success', result.message || AUTH_MESSAGES.REGISTER_SUCCESS);
         markUserCreated();
         navigation.replace('Login');
       } else {
         showAlert('Error', result.message);
       }
     } catch (error) {
-      showAlert('Error', 'Something went wrong. Please try again.');
+      showAlert('Error', AUTH_MESSAGES.UNEXPECTED_ERROR);
     } finally {
       setLoading(false);
     }

@@ -16,7 +16,8 @@ import { getMonthName, getShortMonthName, formatTime12h } from '../../utils/date
 import { formatAmount } from '../../utils/currencyUtils';
 import { getEntriesByType, deleteEntry } from '../../services/entryService';
 import { useAuth } from '../../hooks/useAuth';
-import { showConfirm } from '../../utils/alertUtils';
+import { showAlert, showConfirm } from '../../utils/alertUtils';
+import { EXPENSE_MESSAGES } from '../../messages/expenseMessages';
 
 const ExpenseListScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -33,6 +34,8 @@ const ExpenseListScreen = ({ navigation }) => {
     if (result.success) {
       setEntries(result.data);
       setTotal(result.total);
+    } else {
+      showAlert('Error', EXPENSE_MESSAGES.FETCH_FAILED);
     }
   }, [user, month, year]);
 
@@ -43,10 +46,23 @@ const ExpenseListScreen = ({ navigation }) => {
   );
 
   const onRefresh = useCallback(async () => {
+    if (!user) return;
     setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+    try {
+      const result = await getEntriesByType(user.id, 'spending', month, year);
+      if (result.success) {
+        setEntries(result.data);
+        setTotal(result.total);
+        showAlert('Success', EXPENSE_MESSAGES.REFRESH_SUCCESS);
+      } else {
+        showAlert('Error', EXPENSE_MESSAGES.REFRESH_FAILED);
+      }
+    } catch {
+      showAlert('Error', EXPENSE_MESSAGES.REFRESH_FAILED);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user, month, year]);
 
   const goPrev = () => {
     if (month === 1) { setMonth(12); setYear(year - 1); }
@@ -65,7 +81,12 @@ const ExpenseListScreen = ({ navigation }) => {
   const handleDelete = (entry) => {
     showConfirm('Delete Entry', `Delete "${entry.title}"?`, async () => {
       const result = await deleteEntry(entry.id);
-      if (result.success) loadData();
+      if (result.success) {
+        showAlert('Success', result.message || EXPENSE_MESSAGES.DELETE_SUCCESS);
+        loadData();
+      } else {
+        showAlert('Error', result.message || EXPENSE_MESSAGES.DELETE_FAILED);
+      }
     });
   };
 

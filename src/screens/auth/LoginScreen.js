@@ -15,6 +15,7 @@ import { loginUser } from '../../services/authService';
 import { validateLoginForm } from '../../utils/validators';
 import { useAuth } from '../../hooks/useAuth';
 import { showAlert } from '../../utils/alertUtils';
+import { AUTH_MESSAGES } from '../../messages/authMessages';
 
 const LoginScreen = ({ navigation }) => {
   const { login } = useAuth();
@@ -52,12 +53,13 @@ const LoginScreen = ({ navigation }) => {
       const result = await loginUser({ username, pin });
 
       if (result.success) {
+        showAlert('Success', result.message || AUTH_MESSAGES.LOGIN_SUCCESS);
         login(result.data);
       } else {
         showAlert('Error', result.message);
       }
     } catch (error) {
-      showAlert('Error', 'Something went wrong. Please try again.');
+      showAlert('Error', AUTH_MESSAGES.UNEXPECTED_ERROR);
     } finally {
       setLoading(false);
     }

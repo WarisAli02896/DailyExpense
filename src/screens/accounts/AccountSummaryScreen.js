@@ -16,6 +16,9 @@ import { deleteEntry } from '../../services/entryService';
 import { formatAmount } from '../../utils/currencyUtils';
 import { getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { showAlert, showConfirm } from '../../utils/alertUtils';
+import { ACCOUNT_MESSAGES } from '../../messages/accountMessages';
+import { COMMON_MESSAGES } from '../../messages/commonMessages';
+import { exportSummaryReportPdf } from '../../services/pdfReportService';
 
 const INVEST_COLOR = '#7C4DFF';
 
@@ -23,10 +26,15 @@ const AccountSummaryScreen = ({ route, navigation }) => {
   const { person } = route.params;
   const [entries, setEntries] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const loadEntries = useCallback(async () => {
     const result = await getPersonEntries(person.id);
-    if (result.success) setEntries(result.data);
+    if (result.success) {
+      setEntries(result.data);
+    } else {
+      showAlert('Error', ACCOUNT_MESSAGES.REFRESH_FAILED);
+    }
   }, [person.id]);
 
   useFocusEffect(
@@ -37,8 +45,19 @@ const AccountSummaryScreen = ({ route, navigation }) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadEntries();
-    setRefreshing(false);
+    try {
+      const result = await getPersonEntries(person.id);
+      if (result.success) {
+        setEntries(result.data);
+        showAlert('Success', ACCOUNT_MESSAGES.REFRESH_SUCCESS);
+      } else {
+        showAlert('Error', ACCOUNT_MESSAGES.REFRESH_FAILED);
+      }
+    } catch {
+      showAlert('Error', ACCOUNT_MESSAGES.REFRESH_FAILED);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const totalInvested = entries.reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -49,8 +68,12 @@ const AccountSummaryScreen = ({ route, navigation }) => {
       `Remove this investment of Rs. ${formatAmount(entry.amount)}?`,
       async () => {
         const result = await deleteEntry(entry.id);
-        if (result.success) loadEntries();
-        else showAlert('Error', 'Failed to delete entry.');
+        if (result.success) {
+          showAlert('Success', result.message || COMMON_MESSAGES.DELETE_SUCCESS);
+          loadEntries();
+        } else {
+          showAlert('Error', result.message || COMMON_MESSAGES.DELETE_FAILED);
+        }
       }
     );
   };
@@ -58,6 +81,36 @@ const AccountSummaryScreen = ({ route, navigation }) => {
   const formatEntryDate = (dateStr) => {
     const d = new Date(dateStr);
     return `${String(d.getDate()).padStart(2, '0')} ${getMonthName(d.getMonth() + 1)} ${d.getFullYear()}`;
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      setExportingPdf(true);
+      const result = await exportSummaryReportPdf({
+        title: `${person.name} - Account Report`,
+        subtitle: 'Individual investment account summary',
+        metaLines: [
+          `Total entries: ${entries.length}`,
+        ],
+        totals: [
+          { label: 'Total Invested', value: `Rs. ${formatAmount(totalInvested)}` },
+        ],
+        rows: entries.map((entry) => ({
+          label: `${entry.title} (${formatEntryDate(entry.date)})`,
+          value: `Rs. ${formatAmount(entry.amount || 0)}`,
+        })),
+        fileName: `account-${person.name}-${Date.now()}`,
+      });
+      if (result.success) {
+        showAlert('Success', result.message || COMMON_MESSAGES.PDF_EXPORT_SUCCESS);
+      } else {
+        showAlert('Error', result.message || COMMON_MESSAGES.PDF_EXPORT_FAILED);
+      }
+    } catch (error) {
+      showAlert('Error', COMMON_MESSAGES.PDF_EXPORT_FAILED);
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   const renderEntry = ({ item }) => {
@@ -125,6 +178,15 @@ const AccountSummaryScreen = ({ route, navigation }) => {
       {/* Entries List */}
       <View style={styles.listHeader}>
         <Text style={styles.listTitle}>Investment History</Text>
+        <Pressable
+          style={({ pressed }) => [styles.exportBtn, pressed && { opacity: 0.7 }, exportingPdf && { opacity: 0.5 }]}
+          onPress={handleExportPdf}
+          role="button"
+          disabled={exportingPdf}
+        >
+          <Ionicons name="document-text-outline" size={15} color={INVEST_COLOR} />
+          <Text style={styles.exportBtnText}>{exportingPdf ? 'Exporting...' : 'Export PDF'}</Text>
+        </Pressable>
       </View>
 
       <FlatList
@@ -216,6 +278,9 @@ const styles = StyleSheet.create({
     color: INVEST_COLOR,
   },
   listHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     marginBottom: 10,
   },
@@ -223,6 +288,20 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.lg,
     fontWeight: FONTS.weights.bold,
     color: COLORS.text,
+  },
+  exportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: INVEST_COLOR + '14',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  exportBtnText: {
+    fontSize: FONTS.sizes.xs,
+    fontWeight: FONTS.weights.semiBold,
+    color: INVEST_COLOR,
   },
   listContent: {
     paddingHorizontal: 20,

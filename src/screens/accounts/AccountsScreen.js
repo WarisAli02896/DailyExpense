@@ -15,6 +15,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { addPerson, getPersons, deletePerson, setPersonLock, setActivePerson } from '../../services/personService';
 import { formatAmount } from '../../utils/currencyUtils';
 import { showAlert, showConfirm } from '../../utils/alertUtils';
+import { ACCOUNT_MESSAGES } from '../../messages/accountMessages';
+import { COMMON_MESSAGES } from '../../messages/commonMessages';
+import { exportSummaryReportPdf } from '../../services/pdfReportService';
 
 const INVEST_COLOR = '#7C4DFF';
 
@@ -26,11 +29,16 @@ const AccountsScreen = () => {
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
   const [showInput, setShowInput] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const loadPersons = useCallback(async () => {
     if (!user) return;
     const result = await getPersons(user.id);
-    if (result.success) setPersons(result.data);
+    if (result.success) {
+      setPersons(result.data);
+    } else {
+      showAlert('Error', ACCOUNT_MESSAGES.REFRESH_FAILED);
+    }
   }, [user]);
 
   useFocusEffect(
@@ -42,6 +50,7 @@ const AccountsScreen = () => {
   const selectedTotal = persons
     .filter((p) => selectedIds.includes(p.id))
     .reduce((sum, p) => sum + (p.total_invested || 0), 0);
+  const selectedAccounts = persons.filter((p) => selectedIds.includes(p.id));
 
   const toggleSelection = (personId) => {
     setSelectedIds((prev) => (
@@ -60,9 +69,10 @@ const AccountsScreen = () => {
     if (result.success) {
       setNewName('');
       setShowInput(false);
+      showAlert('Success', ACCOUNT_MESSAGES.ADD_SUCCESS);
       loadPersons();
     } else {
-      showAlert('Error', result.message);
+      showAlert('Error', result.message || ACCOUNT_MESSAGES.ADD_FAILED);
     }
     setAdding(false);
   };
@@ -74,7 +84,12 @@ const AccountsScreen = () => {
       `Remove "${person.name}" from your accounts?`,
       async () => {
         const result = await deletePerson(person.id);
-        if (result.success) loadPersons();
+        if (result.success) {
+          showAlert('Success', ACCOUNT_MESSAGES.DELETE_SUCCESS);
+          loadPersons();
+        } else {
+          showAlert('Error', result.message || ACCOUNT_MESSAGES.DELETE_FAILED);
+        }
       }
     );
   };
@@ -84,9 +99,10 @@ const AccountsScreen = () => {
     const nextLocked = person.is_locked !== 1;
     const result = await setPersonLock(person.id, nextLocked);
     if (result.success) {
+      showAlert('Success', ACCOUNT_MESSAGES.LOCK_UPDATED);
       loadPersons();
     } else {
-      showAlert('Error', result.message);
+      showAlert('Error', result.message || ACCOUNT_MESSAGES.LOCK_UPDATE_FAILED);
     }
   };
 
@@ -96,9 +112,10 @@ const AccountsScreen = () => {
 
     const result = await setActivePerson(user.id, person.id);
     if (result.success) {
+      showAlert('Success', ACCOUNT_MESSAGES.ACTIVE_SET_SUCCESS);
       loadPersons();
     } else {
-      showAlert('Error', result.message);
+      showAlert('Error', result.message || ACCOUNT_MESSAGES.ACTIVE_SET_FAILED);
     }
   };
 
@@ -112,6 +129,41 @@ const AccountsScreen = () => {
 
   const handlePersonLongPress = (person) => {
     toggleSelection(person.id);
+  };
+
+  const handleExportSelectedPdf = async () => {
+    if (selectedAccounts.length === 0) {
+      showAlert('Error', ACCOUNT_MESSAGES.SELECT_ACCOUNTS_FOR_PDF);
+      return;
+    }
+
+    try {
+      setExportingPdf(true);
+      const result = await exportSummaryReportPdf({
+        title: 'Selected Accounts Report',
+        subtitle: 'Investment total for selected accounts',
+        metaLines: [
+          `Selected accounts: ${selectedAccounts.length}`,
+        ],
+        totals: [
+          { label: 'Selected Accounts Total', value: `Rs. ${formatAmount(selectedTotal)}` },
+        ],
+        rows: selectedAccounts.map((account) => ({
+          label: account.name,
+          value: `Rs. ${formatAmount(account.total_invested || 0)}`,
+        })),
+        fileName: `selected-accounts-${Date.now()}`,
+      });
+      if (result.success) {
+        showAlert('Success', result.message || COMMON_MESSAGES.PDF_EXPORT_SUCCESS);
+      } else {
+        showAlert('Error', result.message || COMMON_MESSAGES.PDF_EXPORT_FAILED);
+      }
+    } catch (error) {
+      showAlert('Error', COMMON_MESSAGES.PDF_EXPORT_FAILED);
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   const getInitial = (name) => name.charAt(0).toUpperCase();
@@ -243,6 +295,19 @@ const AccountsScreen = () => {
               <Text style={styles.totalAmount}>Rs. {formatAmount(selectedTotal)}</Text>
             </View>
           </View>
+          <Pressable
+            onPress={handleExportSelectedPdf}
+            style={({ pressed }) => [
+              styles.exportPdfBtn,
+              pressed && { opacity: 0.7 },
+              exportingPdf && { opacity: 0.5 },
+            ]}
+            role="button"
+            disabled={exportingPdf}
+          >
+            <Ionicons name="document-text-outline" size={14} color={INVEST_COLOR} />
+            <Text style={styles.exportPdfText}>{exportingPdf ? 'Exporting...' : 'PDF'}</Text>
+          </Pressable>
           <Pressable
             onPress={() => setSelectedIds([])}
             style={({ pressed }) => [styles.clearSelectionBtn, pressed && { opacity: 0.7 }]}
@@ -394,6 +459,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   clearSelectionText: {
+    fontSize: FONTS.sizes.xs,
+    fontWeight: FONTS.weights.semiBold,
+    color: INVEST_COLOR,
+  },
+  exportPdfBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: INVEST_COLOR + '18',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  exportPdfText: {
     fontSize: FONTS.sizes.xs,
     fontWeight: FONTS.weights.semiBold,
     color: INVEST_COLOR,

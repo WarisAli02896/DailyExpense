@@ -17,4 +17,5 @@ export const AUTH_MESSAGES = {
   PIN_REQUIRED: 'PIN is required.',
   PIN_LENGTH: 'PIN must be exactly 6 digits.',
   PIN_NUMERIC: 'PIN must contain only numbers.',
+  UNEXPECTED_ERROR: 'Something went wrong. Please try again.',
 };

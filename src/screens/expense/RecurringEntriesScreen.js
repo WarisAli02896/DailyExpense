@@ -17,6 +17,7 @@ import { getTemplates, updateTemplate, deleteTemplate } from '../../services/rec
 import { useAuth } from '../../hooks/useAuth';
 import { formatAmount } from '../../utils/currencyUtils';
 import { showAlert, showConfirm } from '../../utils/alertUtils';
+import { COMMON_MESSAGES } from '../../messages/commonMessages';
 
 const RecurringEntriesScreen = () => {
   const { user } = useAuth();
@@ -32,7 +33,11 @@ const RecurringEntriesScreen = () => {
   const loadTemplates = useCallback(async () => {
     if (!user) return;
     const result = await getTemplates(user.id);
-    if (result.success) setTemplates(result.data);
+    if (result.success) {
+      setTemplates(result.data);
+    } else {
+      showAlert('Error', COMMON_MESSAGES.REFRESH_FAILED);
+    }
   }, [user]);
 
   useFocusEffect(
@@ -42,9 +47,21 @@ const RecurringEntriesScreen = () => {
   );
 
   const handleRefresh = async () => {
+    if (!user) return;
     setRefreshing(true);
-    await loadTemplates();
-    setRefreshing(false);
+    try {
+      const result = await getTemplates(user.id);
+      if (result.success) {
+        setTemplates(result.data);
+        showAlert('Success', COMMON_MESSAGES.REFRESH_SUCCESS);
+      } else {
+        showAlert('Error', COMMON_MESSAGES.REFRESH_FAILED);
+      }
+    } catch {
+      showAlert('Error', COMMON_MESSAGES.REFRESH_FAILED);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleDelete = (item) => {
@@ -53,7 +70,12 @@ const RecurringEntriesScreen = () => {
       `Remove "${item.title}" from recurring list?\n\nThis will NOT affect any entries on your Home screen.`,
       async () => {
         const result = await deleteTemplate(item.id);
-        if (result.success) loadTemplates();
+        if (result.success) {
+          showAlert('Success', result.message || COMMON_MESSAGES.DELETE_SUCCESS);
+          loadTemplates();
+        } else {
+          showAlert('Error', result.message || COMMON_MESSAGES.DELETE_FAILED);
+        }
       }
     );
   };
@@ -96,10 +118,11 @@ const RecurringEntriesScreen = () => {
     });
 
     if (result.success) {
+      showAlert('Success', result.message || COMMON_MESSAGES.UPDATE_SUCCESS);
       closeEdit();
       loadTemplates();
     } else {
-      showAlert('Error', result.message);
+      showAlert('Error', result.message || COMMON_MESSAGES.UPDATE_FAILED);
     }
     setUpdating(false);
   };

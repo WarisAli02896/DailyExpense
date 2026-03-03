@@ -20,6 +20,7 @@ import { saveInvoice, formatFileSize, isImageFile, getFileType } from '../../ser
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
+import { EARNING_MESSAGES } from '../../messages/earningMessages';
 
 const SalaryFormScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -92,12 +93,13 @@ const SalaryFormScreen = ({ navigation }) => {
             companyName,
           });
         }
+        showAlert('Success', EARNING_MESSAGES.SALARY_ADD_SUCCESS);
         navigation.goBack();
       } else {
         showAlert('Error', result.message);
       }
     } catch (error) {
-      showAlert('Error', 'Failed to add entry. Please try again.');
+      showAlert('Error', EARNING_MESSAGES.ADD_FAILED);
     } finally {
       setLoading(false);
     }

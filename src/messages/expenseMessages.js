@@ -1,14 +1,19 @@
 export const EXPENSE_MESSAGES = {
   // Success
   ADD_SUCCESS: 'Expense added successfully!',
+  BILL_ADD_SUCCESS: 'Bill added successfully!',
+  INVESTMENT_ADD_SUCCESS: 'Investment added successfully!',
   UPDATE_SUCCESS: 'Expense updated successfully!',
   DELETE_SUCCESS: 'Expense deleted successfully!',
+  REFRESH_SUCCESS: 'Expenses refreshed.',
+  REFRESH_APPLIED: 'Recurring entries applied and list refreshed.',
 
   // Error
   ADD_FAILED: 'Failed to add expense. Please try again.',
   UPDATE_FAILED: 'Failed to update entry. Please try again.',
   DELETE_FAILED: 'Failed to delete expense. Please try again.',
   FETCH_FAILED: 'Failed to load expenses. Please try again.',
+  REFRESH_FAILED: 'Failed to refresh expenses. Please try again.',
 
   // Entry Edit
   ENTRY_UPDATE_SUCCESS: 'Entry updated successfully!',

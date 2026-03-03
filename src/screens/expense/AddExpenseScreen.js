@@ -133,12 +133,13 @@ const AddExpenseScreen = ({ navigation }) => {
             personId,
           });
         }
+        showAlert('Success', EXPENSE_MESSAGES.ADD_SUCCESS);
         navigation.goBack();
       } else {
         showAlert('Error', result.message);
       }
     } catch (error) {
-      showAlert('Error', 'Failed to add expense. Please try again.');
+      showAlert('Error', EXPENSE_MESSAGES.ADD_FAILED);
     } finally {
       setLoading(false);
     }

@@ -16,7 +16,8 @@ import { getMonthName, getShortMonthName, formatTime12h } from '../../utils/date
 import { formatAmount } from '../../utils/currencyUtils';
 import { getEntriesByType, deleteEntry } from '../../services/entryService';
 import { useAuth } from '../../hooks/useAuth';
-import { showConfirm } from '../../utils/alertUtils';
+import { showAlert, showConfirm } from '../../utils/alertUtils';
+import { EARNING_MESSAGES } from '../../messages/earningMessages';
 
 const EarningListScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -33,6 +34,8 @@ const EarningListScreen = ({ navigation }) => {
     if (result.success) {
       setEntries(result.data);
       setTotal(result.total);
+    } else {
+      showAlert('Error', EARNING_MESSAGES.FETCH_FAILED);
     }
   }, [user, month, year]);
 
@@ -43,10 +46,23 @@ const EarningListScreen = ({ navigation }) => {
   );
 
   const onRefresh = useCallback(async () => {
+    if (!user) return;
     setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
-  }, [loadData]);
+    try {
+      const result = await getEntriesByType(user.id, 'earning', month, year);
+      if (result.success) {
+        setEntries(result.data);
+        setTotal(result.total);
+        showAlert('Success', EARNING_MESSAGES.REFRESH_SUCCESS);
+      } else {
+        showAlert('Error', EARNING_MESSAGES.REFRESH_FAILED);
+      }
+    } catch {
+      showAlert('Error', EARNING_MESSAGES.REFRESH_FAILED);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [user, month, year]);
 
   const goPrev = () => {
     if (month === 1) { setMonth(12); setYear(year - 1); }
@@ -65,7 +81,12 @@ const EarningListScreen = ({ navigation }) => {
   const handleDelete = (entry) => {
     showConfirm('Delete Entry', `Delete "${entry.title}"?`, async () => {
       const result = await deleteEntry(entry.id);
-      if (result.success) loadData();
+      if (result.success) {
+        showAlert('Success', result.message || EARNING_MESSAGES.DELETE_SUCCESS);
+        loadData();
+      } else {
+        showAlert('Error', result.message || EARNING_MESSAGES.DELETE_FAILED);
+      }
     });
   };
 

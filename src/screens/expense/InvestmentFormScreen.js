@@ -22,6 +22,7 @@ import { saveInvoice, formatFileSize, getFileType } from '../../services/fileSer
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName, formatTime12h } from '../../utils/dateUtils';
 import { showAlert } from '../../utils/alertUtils';
+import { EXPENSE_MESSAGES } from '../../messages/expenseMessages';
 
 const INVEST_COLOR = '#7C4DFF';
 
@@ -129,12 +130,13 @@ const InvestmentFormScreen = ({ navigation }) => {
             personId: parseInt(selectedPerson, 10),
           });
         }
+        showAlert('Success', EXPENSE_MESSAGES.INVESTMENT_ADD_SUCCESS);
         navigation.goBack();
       } else {
         showAlert('Error', result.message);
       }
     } catch (error) {
-      showAlert('Error', 'Failed to add investment. Please try again.');
+      showAlert('Error', EXPENSE_MESSAGES.ADD_FAILED);
     } finally {
       setLoading(false);
     }

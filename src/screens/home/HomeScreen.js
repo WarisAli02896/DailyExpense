@@ -18,6 +18,9 @@ import { getEntriesByMonth, getMonthSummary, deleteEntry } from '../../services/
 import { applyRecurringEntries } from '../../services/recurringService';
 import { useAuth } from '../../hooks/useAuth';
 import { showAlert, showConfirm } from '../../utils/alertUtils';
+import { EXPENSE_MESSAGES } from '../../messages/expenseMessages';
+import { COMMON_MESSAGES } from '../../messages/commonMessages';
+import { exportSummaryReportPdf } from '../../services/pdfReportService';
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
@@ -29,6 +32,7 @@ const HomeScreen = ({ navigation }) => {
   const [summary, setSummary] = useState({ totalEarnings: 0, totalSpendings: 0, amountLeft: 0 });
   const [refreshing, setRefreshing] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const isCurrentMonth = year === new Date().getFullYear() && month === new Date().getMonth() + 1;
 
@@ -58,6 +62,9 @@ const HomeScreen = ({ navigation }) => {
 
     if (entriesResult.success) setEntries(entriesResult.data);
     if (summaryResult.success) setSummary(summaryResult.data);
+    if (!entriesResult.success || !summaryResult.success) {
+      showAlert('Error', COMMON_MESSAGES.REFRESH_FAILED);
+    }
   }, [user, month, year]);
 
   useFocusEffect(
@@ -69,11 +76,20 @@ const HomeScreen = ({ navigation }) => {
   const onRefresh = useCallback(async () => {
     if (!user) return;
     setRefreshing(true);
-    const result = await applyRecurringEntries(user.id, month, year);
-    await loadData();
-    setRefreshing(false);
-    if (result.success && result.added > 0) {
-      showAlert('Recurring Entries', result.message);
+    try {
+      const result = await applyRecurringEntries(user.id, month, year);
+      await loadData();
+      if (result.success && result.added > 0) {
+        showAlert('Success', result.message || EXPENSE_MESSAGES.REFRESH_APPLIED);
+      } else if (result.success) {
+        showAlert('Success', result.message || COMMON_MESSAGES.REFRESH_SUCCESS);
+      } else {
+        showAlert('Error', result.message || COMMON_MESSAGES.REFRESH_FAILED);
+      }
+    } catch {
+      showAlert('Error', COMMON_MESSAGES.REFRESH_FAILED);
+    } finally {
+      setRefreshing(false);
     }
   }, [user, month, year, loadData]);
 
@@ -83,9 +99,46 @@ const HomeScreen = ({ navigation }) => {
       `Are you sure you want to delete "${entry.title}"?`,
       async () => {
         const result = await deleteEntry(entry.id);
-        if (result.success) loadData();
+        if (result.success) {
+          showAlert('Success', result.message || COMMON_MESSAGES.DELETE_SUCCESS);
+          loadData();
+        } else {
+          showAlert('Error', result.message || COMMON_MESSAGES.DELETE_FAILED);
+        }
       }
     );
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      setExportingPdf(true);
+      const result = await exportSummaryReportPdf({
+        title: `${monthName} ${year} - Home Report`,
+        subtitle: 'Monthly earnings, spendings and entry list',
+        metaLines: [
+          `Entries: ${entries.length}`,
+        ],
+        totals: [
+          { label: 'Amount Left', value: `Rs. ${formatAmount(summary.amountLeft)}` },
+          { label: 'Total Earnings', value: `Rs. ${formatAmount(summary.totalEarnings)}` },
+          { label: 'Total Spendings', value: `Rs. ${formatAmount(summary.totalSpendings)}` },
+        ],
+        rows: entries.map((entry) => ({
+          label: `${entry.title} (${entry.type})`,
+          value: `Rs. ${formatAmount(entry.amount || 0)}`,
+        })),
+        fileName: `home-report-${year}-${String(month).padStart(2, '0')}-${Date.now()}`,
+      });
+      if (result.success) {
+        showAlert('Success', result.message || COMMON_MESSAGES.PDF_EXPORT_SUCCESS);
+      } else {
+        showAlert('Error', result.message || COMMON_MESSAGES.PDF_EXPORT_FAILED);
+      }
+    } catch (error) {
+      showAlert('Error', COMMON_MESSAGES.PDF_EXPORT_FAILED);
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
   const monthName = getMonthName(month);
@@ -192,6 +245,14 @@ const HomeScreen = ({ navigation }) => {
         <Text style={styles.sectionTitle}>Recent Entries</Text>
         <View style={styles.sectionRight}>
           <Text style={styles.entryCount}>{entries.length} Entries</Text>
+            <Pressable
+              style={({ pressed }) => [styles.exportButton, pressed && { opacity: 0.6 }, exportingPdf && { opacity: 0.5 }]}
+              onPress={handleExportPdf}
+              role="button"
+              disabled={exportingPdf}
+            >
+              <Ionicons name="document-text-outline" size={17} color={COLORS.primary} />
+            </Pressable>
           <Pressable
             style={({ pressed }) => [styles.refreshButton, pressed && { opacity: 0.6 }]}
             onPress={onRefresh}
@@ -452,6 +513,14 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   refreshButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.primary + '12',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  exportButton: {
     width: 34,
     height: 34,
     borderRadius: 17,
