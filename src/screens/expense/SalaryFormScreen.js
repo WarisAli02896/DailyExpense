@@ -16,6 +16,7 @@ import { Button, Input } from '../../components/common';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
 import { addEntry } from '../../services/entryService';
+import { addOrUpdateTemplate } from '../../services/recurringService';
 import { pickInvoice, saveInvoice, formatFileSize, isImageFile, getFileType } from '../../services/fileService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatDateForDB, getMonthName } from '../../utils/dateUtils';
@@ -89,6 +90,16 @@ const SalaryFormScreen = ({ navigation }) => {
       });
 
       if (result.success) {
+        if (isRecurring) {
+          await addOrUpdateTemplate({
+            userId: user.id,
+            type: 'earning',
+            entryType: 'salary',
+            title: `Salary - ${companyName}`,
+            amount: parseFloat(amount),
+            companyName,
+          });
+        }
         navigation.goBack();
       } else {
         Alert.alert('Error', result.message);

@@ -14,67 +14,66 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../../constants/colors';
 import { FONTS } from '../../constants/fonts';
-import { getRecurringEntries, updateRecurringEntry, deleteEntry } from '../../services/entryService';
+import { getTemplates, updateTemplate, deleteTemplate } from '../../services/recurringService';
 import { useAuth } from '../../hooks/useAuth';
 import { formatAmount } from '../../utils/currencyUtils';
-import { getMonthName, getShortMonthName, formatTime12h } from '../../utils/dateUtils';
 
-const RecurringEntriesScreen = ({ navigation }) => {
+const RecurringEntriesScreen = () => {
   const { user } = useAuth();
-  const [entries, setEntries] = useState([]);
+  const [templates, setTemplates] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [editEntry, setEditEntry] = useState(null);
+  const [editItem, setEditItem] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editCompany, setEditCompany] = useState('');
   const [updating, setUpdating] = useState(false);
 
-  const loadEntries = useCallback(async () => {
+  const loadTemplates = useCallback(async () => {
     if (!user) return;
-    const result = await getRecurringEntries(user.id);
-    if (result.success) setEntries(result.data);
+    const result = await getTemplates(user.id);
+    if (result.success) setTemplates(result.data);
   }, [user]);
 
   useFocusEffect(
     useCallback(() => {
-      loadEntries();
-    }, [loadEntries])
+      loadTemplates();
+    }, [loadTemplates])
   );
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadEntries();
+    await loadTemplates();
     setRefreshing(false);
   };
 
-  const handleDelete = (entry) => {
+  const handleDelete = (item) => {
     Alert.alert(
-      'Delete Recurring Entry',
-      `Remove "${entry.title}" from recurring entries?`,
+      'Delete Template',
+      `Remove "${item.title}" from recurring list?\n\nThis will NOT affect any entries on your Home screen.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const result = await deleteEntry(entry.id);
-            if (result.success) loadEntries();
+            const result = await deleteTemplate(item.id);
+            if (result.success) loadTemplates();
           },
         },
       ]
     );
   };
 
-  const openEdit = (entry) => {
-    setEditEntry(entry);
-    setEditTitle(entry.title || '');
-    setEditAmount(String(entry.amount || ''));
-    setEditCompany(entry.company_name || '');
+  const openEdit = (item) => {
+    setEditItem(item);
+    setEditTitle(item.title || '');
+    setEditAmount(String(item.amount || ''));
+    setEditCompany(item.company_name || '');
   };
 
   const closeEdit = () => {
-    setEditEntry(null);
+    setEditItem(null);
     setEditTitle('');
     setEditAmount('');
     setEditCompany('');
@@ -96,48 +95,30 @@ const RecurringEntriesScreen = ({ navigation }) => {
       return;
     }
 
-    const titleSame = editTitle.trim() === (editEntry.title || '');
-    const amountSame = parseFloat(editAmount) === editEntry.amount;
-    const companySame = (editCompany.trim() || '') === (editEntry.company_name || '');
-
-    if (titleSame && amountSame && companySame) {
-      closeEdit();
-      return;
-    }
-
     setUpdating(true);
-    const result = await updateRecurringEntry(editEntry, {
+    const result = await updateTemplate(editItem.id, {
       title: editTitle.trim(),
       amount: parseFloat(editAmount),
       companyName: editCompany.trim() || null,
     });
 
     if (result.success) {
-      Alert.alert('Updated', 'Previous entries are preserved. A new entry has been created for upcoming months.');
       closeEdit();
-      loadEntries();
+      loadTemplates();
     } else {
       Alert.alert('Error', result.message);
     }
     setUpdating(false);
   };
 
-  const totalEarnings = entries.filter((e) => e.type === 'earning').reduce((s, e) => s + e.amount, 0);
-  const totalSpendings = entries.filter((e) => e.type === 'spending').reduce((s, e) => s + e.amount, 0);
+  const totalEarnings = templates.filter((t) => t.type === 'earning').reduce((s, t) => s + t.amount, 0);
+  const totalSpendings = templates.filter((t) => t.type === 'spending').reduce((s, t) => s + t.amount, 0);
 
-  const renderEntry = ({ item }) => {
+  const renderTemplate = ({ item }) => {
     const isEarning = item.type === 'earning';
-    const day = new Date(item.date);
-    const datePart = `${String(day.getDate()).padStart(2, '0')} ${getShortMonthName(day.getMonth() + 1)}`;
-    const timePart = formatTime12h(item.date);
-    const dateLabel = timePart ? `${datePart} · ${timePart}` : datePart;
 
     return (
-      <Pressable
-        style={({ pressed }) => [styles.entryRow, pressed && styles.entryRowPressed]}
-        onPress={() => navigation.navigate('EntryDetail', { entry: item })}
-        role="button"
-      >
+      <View style={styles.entryRow}>
         <View style={[styles.typeIndicator, isEarning ? styles.earningIndicator : styles.spendingIndicator]} />
 
         <View style={styles.entryIconWrap}>
@@ -151,9 +132,7 @@ const RecurringEntriesScreen = ({ navigation }) => {
         <View style={styles.entryDetails}>
           <Text style={styles.entryTitle} numberOfLines={1}>{item.title}</Text>
           <View style={styles.entryMeta}>
-            <Text style={styles.entryMetaText}>
-              {item.entry_type}{dateLabel ? ` · ${dateLabel}` : ''}
-            </Text>
+            <Text style={styles.entryMetaText}>{item.entry_type}</Text>
             <View style={styles.recurringTag}>
               <Ionicons name="repeat" size={10} color={COLORS.primary} />
               <Text style={styles.recurringTagText}>Monthly</Text>
@@ -165,13 +144,13 @@ const RecurringEntriesScreen = ({ navigation }) => {
         </View>
 
         <Text style={[styles.entryAmount, isEarning ? styles.earningAmt : styles.spendingAmt]}>
-          {isEarning ? '+' : '-'} Rs. {formatAmount(item.amount)}
+          Rs. {formatAmount(item.amount)}
         </Text>
 
         <View style={styles.entryActions}>
           <Pressable
             style={({ pressed }) => [styles.actionBtn, pressed && styles.actionBtnPressed]}
-            onPress={(e) => { e.stopPropagation(); openEdit(item); }}
+            onPress={() => openEdit(item)}
             role="button"
             hitSlop={6}
           >
@@ -179,28 +158,36 @@ const RecurringEntriesScreen = ({ navigation }) => {
           </Pressable>
           <Pressable
             style={({ pressed }) => [styles.actionBtn, pressed && styles.deleteBtnPressed]}
-            onPress={(e) => { e.stopPropagation(); handleDelete(item); }}
+            onPress={() => handleDelete(item)}
             role="button"
             hitSlop={6}
           >
             <Ionicons name="trash-outline" size={18} color={COLORS.danger} />
           </Pressable>
         </View>
-      </Pressable>
+      </View>
     );
   };
 
   return (
     <View style={styles.container}>
-      {/* Summary Header */}
-      {entries.length > 0 && (
+      {/* Info Banner */}
+      <View style={styles.infoBanner}>
+        <Ionicons name="information-circle-outline" size={18} color={COLORS.primary} />
+        <Text style={styles.infoBannerText}>
+          This is your tracking list. Editing or deleting here does NOT affect entries on your Home screen.
+        </Text>
+      </View>
+
+      {/* Summary */}
+      {templates.length > 0 && (
         <View style={styles.summaryCard}>
           <View style={styles.summaryItem}>
             <View style={[styles.summaryDot, { backgroundColor: COLORS.income + '20' }]}>
               <Ionicons name="arrow-down-circle" size={18} color={COLORS.income} />
             </View>
             <View>
-              <Text style={styles.summaryLabel}>Recurring Earnings</Text>
+              <Text style={styles.summaryLabel}>Monthly Earnings</Text>
               <Text style={[styles.summaryValue, { color: COLORS.income }]}>
                 Rs. {formatAmount(totalEarnings)}
               </Text>
@@ -212,7 +199,7 @@ const RecurringEntriesScreen = ({ navigation }) => {
               <Ionicons name="arrow-up-circle" size={18} color={COLORS.expense} />
             </View>
             <View>
-              <Text style={styles.summaryLabel}>Recurring Spendings</Text>
+              <Text style={styles.summaryLabel}>Monthly Spendings</Text>
               <Text style={[styles.summaryValue, { color: COLORS.expense }]}>
                 Rs. {formatAmount(totalSpendings)}
               </Text>
@@ -222,52 +209,47 @@ const RecurringEntriesScreen = ({ navigation }) => {
       )}
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Monthly Entries</Text>
-        <Text style={styles.sectionCount}>{entries.length} entries</Text>
+        <Text style={styles.sectionTitle}>Recurring Templates</Text>
+        <Text style={styles.sectionCount}>{templates.length}</Text>
       </View>
 
       <FlatList
-        data={entries}
-        renderItem={renderEntry}
+        data={templates}
+        renderItem={renderTemplate}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={COLORS.primary}
-            colors={[COLORS.primary]}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="repeat-outline" size={60} color={COLORS.textLight} />
             <Text style={styles.emptyTitle}>No recurring entries</Text>
             <Text style={styles.emptyText}>
-              Entries marked as monthly will appear here
+              When you add a salary with "Monthly Recurring" toggled on, it will appear here for tracking
             </Text>
           </View>
         }
       />
 
       {/* Edit Modal */}
-      <Modal visible={!!editEntry} transparent animationType="fade" onRequestClose={closeEdit}>
+      <Modal visible={!!editItem} transparent animationType="fade" onRequestClose={closeEdit}>
         <Pressable style={styles.overlay} onPress={closeEdit}>
           <Pressable style={styles.modal} onPress={() => {}}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Update Entry</Text>
+              <Text style={styles.modalTitle}>Update Template</Text>
               <Pressable onPress={closeEdit} role="button">
                 <Ionicons name="close" size={24} color={COLORS.textSecondary} />
               </Pressable>
             </View>
 
-            {editEntry && (
+            {editItem && (
               <View style={styles.modalBody}>
-                <View style={styles.infoNote}>
-                  <Ionicons name="information-circle-outline" size={16} color={COLORS.primary} />
-                  <Text style={styles.infoNoteText}>
-                    Previous months will stay unchanged. Changes apply to new entries only.
+                <View style={styles.modalNote}>
+                  <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.income} />
+                  <Text style={styles.modalNoteText}>
+                    Your existing Home screen entries will NOT be changed
                   </Text>
                 </View>
 
@@ -299,7 +281,7 @@ const RecurringEntriesScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                {editEntry.entry_type === 'salary' && (
+                {editItem.entry_type === 'salary' && (
                   <View style={styles.modalField}>
                     <Text style={styles.fieldLabel}>Company</Text>
                     <TextInput
@@ -344,6 +326,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
     padding: 20,
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary + '10',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '18',
+  },
+  infoBannerText: {
+    fontSize: FONTS.sizes.sm,
+    color: COLORS.primary,
+    flex: 1,
+    lineHeight: 18,
   },
   summaryCard: {
     flexDirection: 'row',
@@ -409,10 +408,6 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.06)',
-  },
-  entryRowPressed: {
-    opacity: 0.85,
-    backgroundColor: COLORS.borderLight,
   },
   typeIndicator: {
     width: 4,
@@ -511,6 +506,7 @@ const styles = StyleSheet.create({
     color: COLORS.textLight,
     marginTop: 6,
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
   overlay: {
     flex: 1,
@@ -539,18 +535,18 @@ const styles = StyleSheet.create({
   modalBody: {
     padding: 20,
   },
-  infoNote: {
+  modalNote: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.primary + '10',
+    backgroundColor: COLORS.income + '10',
     padding: 12,
     borderRadius: 10,
     marginBottom: 16,
     gap: 8,
   },
-  infoNoteText: {
+  modalNoteText: {
     fontSize: FONTS.sizes.sm,
-    color: COLORS.primary,
+    color: COLORS.income,
     flex: 1,
   },
   modalField: {
